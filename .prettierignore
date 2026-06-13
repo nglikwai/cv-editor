@@ -1,0 +1,12 @@
+pnpm-lock.yaml
+submodules/
+auto-imports.d.ts
+.eslintrc-auto-import.json
+# Build outputs
+dist/
+build/
+# Generated files (only auto-generated ones)
+packages/*/dist/*.d.ts
+packages/*/src/pako.d.ts
+# Node modules
+node_modules/

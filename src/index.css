@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-deep-blue: #1a365d;
+  --color-golden-yellow: #d4a039;
+  --color-light-blue: #2c5282;
+  --color-text-dark: #334155;
+  --color-text-light: #64748b;
+  --color-bg-light: #f8fafc;
+  --color-golden-hover: #8a8260;
+  --color-light-blue-hover: #2b4a6f;
+  --color-border-light: #e2e8f0;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@page :left {
+  margin-top: 8mm;
+}
+
+@page :right {
+  margin-top: 8mm;
+}
+
+@page :first {
+  margin-top: 0;
+}
