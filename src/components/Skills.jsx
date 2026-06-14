@@ -14,16 +14,17 @@ export const Skills = ({ skills, updateField }) => {
 
   return (
     <div className="cv-section py-3 px-8">
-      <h2 className="text-sm font-bold uppercase text-deep-blue pb-1.5 mb-2 tracking-wide border-b-2 border-golden-yellow flex items-center before:content-[''] before:w-1 before:h-3.5 before:bg-golden-yellow before:mr-2 before:inline-block">
-        Core Skills
+      <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-2.5">
+        <span className="shrink-0">Core Skills</span>
+        <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
       <div className="flex flex-wrap gap-1.5">
         {itemsToRender.map((skill, index) => (
-          <span key={index} className={`inline-flex items-center bg-bg-light py-1 px-2 rounded border-l-2 border-golden-yellow text-sm font-medium text-text-dark${index >= coreSkills.length ? ' print:hidden' : ''}`}>
+          <span key={index} className={`inline-flex items-center bg-deep-blue/5 py-0.5 px-2.5 rounded-full border border-golden-yellow/40 text-xs font-medium text-text-dark${index >= coreSkills.length ? ' print:hidden' : ''}`}>
             <EditableInput
               value={skill}
               onChange={(v) => handleSkillChange(index, v)}
-              className="text-sm w-auto min-w-8 bg-transparent font-medium"
+              className="text-xs w-auto min-w-8 bg-transparent font-medium"
               placeholder={index >= coreSkills.length ? 'Add skill...' : ''}
             />
           </span>

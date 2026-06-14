@@ -6,20 +6,23 @@ export const Header = ({ basics, updateField }) => {
   const { name, headline, contacts, location, workAuthorization, driving, travel } = basics
 
   return (
-    <div className="cv-header bg-deep-blue text-white py-6 px-8">
-      <div className="text-2xl font-bold text-white mb-0.5 tracking-widest">
+    <div className="cv-header bg-deep-blue text-white py-7 px-8">
+      <div className="text-3xl font-black text-white mb-1 tracking-[0.12em] uppercase">
         <EditableInput
           value={name?.full}
           onChange={(v) => updateField('basics.name.full', v)}
-          className="text-2xl font-black tracking-widest text-white"
+          className="text-3xl font-black tracking-[0.12em] uppercase text-white"
         />
       </div>
-      <div className="text-sm text-golden-yellow mb-3 font-normal tracking-wide">
-        <EditableInput
-          value={headline}
-          onChange={(v) => updateField('basics.headline', v)}
-          className="text-golden-yellow font-normal"
-        />
+      <div className="flex items-center gap-2.5 mb-4">
+        <span className="w-6 h-px bg-golden-yellow shrink-0" />
+        <div className="text-sm text-golden-yellow font-medium tracking-wider">
+          <EditableInput
+            value={headline}
+            onChange={(v) => updateField('basics.headline', v)}
+            className="text-golden-yellow font-medium tracking-wider"
+          />
+        </div>
       </div>
       <div className="flex flex-wrap gap-y-1 gap-x-5 text-sm text-slate-200">
         <div className="flex items-center gap-1.5">

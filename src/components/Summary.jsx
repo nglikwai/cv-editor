@@ -4,8 +4,9 @@ import { EditableTextarea } from './EditableInput'
 export const Summary = ({ summary, updateField }) => {
   return (
     <div className="cv-section pt-5 pb-2 px-8">
-      <h2 className="text-sm font-bold uppercase text-deep-blue pb-1.5 mb-2 tracking-wide border-b-2 border-golden-yellow flex items-center before:content-[''] before:w-1 before:h-3.5 before:bg-golden-yellow before:mr-2 before:inline-block">
-        Professional Summary
+      <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-2.5">
+        <span className="shrink-0">Professional Summary</span>
+        <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
       <div className="text-sm text-text-dark leading-snug">
         <EditableTextarea
