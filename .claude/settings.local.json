@@ -9,7 +9,9 @@
       "Bash(npx tailwindcss init -p)",
       "Bash(npm run build:*)",
       "Bash(pnpm add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Skill(run)",
+      "Bash(xargs ps -p)"
     ]
   }
 }
