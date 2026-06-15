@@ -1,4 +1,4 @@
-import { FiSave, FiEdit, FiPrinter, FiSettings } from 'react-icons/fi'
+import { FiClock, FiEdit, FiPrinter, FiSave, FiSettings } from 'react-icons/fi'
 import { RiRobot2Line } from 'react-icons/ri'
 
 const ToolbarButton = ({ onClick, disabled, label, children }) => {
@@ -22,11 +22,14 @@ const Divider = () => (
   <div className="h-px w-8 bg-white/20 self-center my-1" />
 )
 
-export const Toolbar = ({ onSave, onExportPDF, onEditJson, onAI, onSettings, saving }) => {
+export const Toolbar = ({ onSave, onExportPDF, onEditJson, onAI, onSettings, onVersions, saving }) => {
   return (
     <div className="toolbar fixed top-1/2 right-4 -translate-y-1/2 bg-white/10 backdrop-blur-md border border-white/20 px-2.5 py-3 flex flex-col items-center gap-2 z-[1000] shadow-[0_4px_24px_rgba(0,0,0,0.15)] rounded-full print:hidden">
-      <ToolbarButton onClick={onSave} disabled={saving} label="Save JSON">
+      <ToolbarButton onClick={onSave} disabled={saving} label="Save">
         <FiSave />
+      </ToolbarButton>
+      <ToolbarButton onClick={onVersions} label="Saved Versions">
+        <FiClock />
       </ToolbarButton>
       <ToolbarButton onClick={onEditJson} label="Edit JSON">
         <FiEdit />

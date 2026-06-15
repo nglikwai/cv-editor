@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { Toolbar } from './components/Toolbar'
 import { CVPage } from './components/CVPage'
 import { JsonEditorModal } from './components/JsonEditorModal'
+import { SaveNameModal } from './components/SaveNameModal'
+import { SavesModal } from './components/SavesModal'
 import { SettingsModal, DEFAULT_SETTINGS, applyThemeColors } from './components/SettingsModal'
 import { useCVData } from './hooks/useCVData'
-import { loadFromS3, saveToS3, loadSettings, saveSettings } from './services/s3'
+import { loadFromS3, loadLatestFromS3, saveToS3, loadSettings, saveSettings } from './services/s3'
 import initialData from '../cv.json'
 
 function App() {
@@ -12,6 +14,9 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [saveNameOpen, setSaveNameOpen] = useState(false)
+  const [savesOpen, setSavesOpen] = useState(false)
+  const [currentSaveName, setCurrentSaveName] = useState(null)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [snackbar, setSnackbar] = useState(null)
 
@@ -20,16 +25,16 @@ function App() {
     setTimeout(() => setSnackbar(null), 3000)
   }
 
-  // Load from S3 on mount
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [data, savedSettings] = await Promise.all([
-          loadFromS3(),
+        const [{ data, name }, savedSettings] = await Promise.all([
+          loadLatestFromS3(),
           loadSettings(),
         ])
         if (data) {
           loadData(data)
+          setCurrentSaveName(name)
         }
         if (savedSettings) {
           setSettings(savedSettings)
@@ -42,16 +47,36 @@ function App() {
     loadInitialData()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = () => {
+    setSaveNameOpen(true)
+  }
+
+  const handleConfirmSave = async (name) => {
+    setSaveNameOpen(false)
     try {
       setSaving(true)
-      await saveToS3(cvData)
-      showSnackbar('Saved successfully!')
+      await saveToS3(cvData, name)
+      setCurrentSaveName(name)
+      showSnackbar(`Saved as "${name}"`)
     } catch (err) {
       console.error('Error saving to S3:', err)
       showSnackbar('Error saving: ' + err.message, 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleLoadVersion = async (name) => {
+    try {
+      const data = await loadFromS3(name)
+      if (data) {
+        loadData(data)
+        setCurrentSaveName(name)
+        showSnackbar(`Loaded "${name}"`)
+      }
+    } catch (err) {
+      console.error('Error loading version:', err)
+      showSnackbar('Error loading: ' + err.message, 'error')
     }
   }
 
@@ -87,6 +112,7 @@ function App() {
         onEditJson={() => setJsonEditorOpen(true)}
         onAI={handleAI}
         onSettings={() => setSettingsOpen(true)}
+        onVersions={() => setSavesOpen(true)}
         saving={saving}
       />
       <JsonEditorModal
@@ -95,6 +121,17 @@ function App() {
         cvData={cvData}
         onConfirm={loadData}
         showSnackbar={showSnackbar}
+      />
+      <SaveNameModal
+        isOpen={saveNameOpen}
+        onConfirm={handleConfirmSave}
+        onCancel={() => setSaveNameOpen(false)}
+        defaultName={currentSaveName}
+      />
+      <SavesModal
+        isOpen={savesOpen}
+        onClose={() => setSavesOpen(false)}
+        onLoad={handleLoadVersion}
       />
       <SettingsModal
         isOpen={settingsOpen}
@@ -110,7 +147,7 @@ function App() {
       </div>
       {snackbar && (
         <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg text-white text-sm font-medium shadow-lg z-[3000] backdrop-blur-sm ${snackbar.type === 'error' ? 'bg-red-600/70' : 'bg-green-600/70'}`}
+          className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg text-white text-sm font-medium shadow-lg z-3000 backdrop-blur-sm ${snackbar.type === 'error' ? 'bg-red-600/70' : 'bg-green-600/70'}`}
         >
           {snackbar.message}
         </div>
