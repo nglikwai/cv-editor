@@ -12,6 +12,11 @@
   --color-border-light: #e2e8f0;
 }
 
+* {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 @page {
   size: A4;
   margin: 0;

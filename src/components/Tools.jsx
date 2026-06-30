@@ -16,7 +16,7 @@ export const Tools = ({ tools, dataKey = 'toolsAndTechnologies', updateField }) 
   }
 
   return (
-    <div className="cv-section py-5 px-8">
+    <div className="cv-section py-4 px-8">
       <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
         <span className="shrink-0">Selected Expertise &amp; Technologies</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />

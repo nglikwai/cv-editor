@@ -34,7 +34,7 @@ export const EditableTextarea = ({ value, onChange, className = '', placeholder 
   return (
     <textarea
       ref={textareaRef}
-      className={`editable-textarea border border-transparent bg-transparent font-[inherit] text-inherit w-full px-0.5 pt-0 pb-[5px] resize-none overflow-hidden transition-colors duration-150 leading-tight rounded-sm hover:bg-golden-yellow/10 hover:border-golden-yellow/50 focus:outline-none focus:border-golden-yellow focus:bg-golden-yellow/10 ${className}`}
+      className={`editable-textarea border border-transparent bg-transparent font-[inherit] text-inherit w-full px-0.5 pt-0 pb-px resize-none overflow-hidden transition-colors duration-150 rounded-sm hover:bg-golden-yellow/10 hover:border-golden-yellow/50 focus:outline-none focus:border-golden-yellow focus:bg-golden-yellow/10 ${className}`}
       value={value || ''}
       placeholder={placeholder}
       onChange={handleChange}
