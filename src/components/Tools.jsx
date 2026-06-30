@@ -5,20 +5,20 @@ const categoryLabels = {
   dcsScada: 'DCS/SCADA',
   plcPlatforms: 'PLC Platforms',
   documentation: 'Documentation',
-  cyberFocus: 'Cyber Focus'
+  cyberFocus: 'Cyber Focus',
 }
 
-export const Tools = ({ tools, updateField }) => {
+export const Tools = ({ tools, dataKey = 'toolsAndTechnologies', updateField }) => {
   if (!tools || Object.keys(tools).length === 0) return null
 
   const handleToolChange = (category, index, value) => {
-    updateField(`toolsAndTechnologies.${category}[${index}]`, value)
+    updateField(`${dataKey}.${category}[${index}]`, value)
   }
 
   return (
     <div className="cv-section py-3 px-8">
       <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-2.5">
-        <span className="shrink-0">Tools & Technologies</span>
+        <span className="shrink-0">Selected Expertise &amp; Technologies</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
       <div className="space-y-0.5">
@@ -28,7 +28,9 @@ export const Tools = ({ tools, updateField }) => {
 
           return (
             <div key={category} className="text-sm leading-snug flex gap-2">
-              <p className="font-semibold shrink-0 text-deep-blue uppercase text-xs tracking-wide w-32">{categoryLabels[category] || category}: </p>
+              <p className="font-semibold shrink-0 text-deep-blue uppercase text-xs tracking-wide w-32">
+                {categoryLabels[category] || category}:{' '}
+              </p>
               <p className="text-text-dark">
                 {itemsToRender.map((item, index) => (
                   <span key={index} className={index >= (items?.length || 0) ? 'print:hidden' : undefined}>
