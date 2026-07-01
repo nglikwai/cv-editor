@@ -6,7 +6,7 @@ import { SaveNameModal } from './components/SaveNameModal'
 import { SavesModal } from './components/SavesModal'
 import { SettingsModal, DEFAULT_SETTINGS, applyThemeColors } from './components/SettingsModal'
 import { useCVData } from './hooks/useCVData'
-import { loadFromS3, loadLatestFromS3, saveToS3, loadSettings, saveSettings } from './services/s3'
+import { loadFromS3, loadLatestFromS3, listSaves, saveToS3, loadSettings, saveSettings } from './services/s3'
 import initialData from '../cv.json'
 
 function App() {
@@ -17,6 +17,8 @@ function App() {
   const [saveNameOpen, setSaveNameOpen] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
   const [currentSaveName, setCurrentSaveName] = useState(null)
+  const [currentSaveTags, setCurrentSaveTags] = useState([])
+  const [saveModalTags, setSaveModalTags] = useState({ allTags: [], defaultTags: [] })
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [snackbar, setSnackbar] = useState(null)
 
@@ -28,13 +30,14 @@ function App() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [{ data, name }, savedSettings] = await Promise.all([
+        const [{ data, name, tags }, savedSettings] = await Promise.all([
           loadLatestFromS3(),
           loadSettings(),
         ])
         if (data) {
           loadData(data)
           setCurrentSaveName(name)
+          setCurrentSaveTags(tags || [])
         }
         if (savedSettings) {
           setSettings(savedSettings)
@@ -47,16 +50,26 @@ function App() {
     loadInitialData()
   }, [])
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    try {
+      const saves = await listSaves()
+      const allTags = [...new Set(saves.flatMap((s) => s.tags || []))].sort()
+      const existing = saves.find((s) => s.name === currentSaveName)
+      setSaveModalTags({ allTags, defaultTags: existing?.tags || currentSaveTags })
+    } catch (err) {
+      console.error('Error listing saves:', err)
+      setSaveModalTags({ allTags: [], defaultTags: currentSaveTags })
+    }
     setSaveNameOpen(true)
   }
 
-  const handleConfirmSave = async (name) => {
+  const handleConfirmSave = async (name, tags) => {
     setSaveNameOpen(false)
     try {
       setSaving(true)
-      await saveToS3(cvData, name)
+      await saveToS3(cvData, name, tags)
       setCurrentSaveName(name)
+      setCurrentSaveTags(tags)
       showSnackbar(`Saved as "${name}"`)
     } catch (err) {
       console.error('Error saving to S3:', err)
@@ -66,12 +79,13 @@ function App() {
     }
   }
 
-  const handleLoadVersion = async (name) => {
+  const handleLoadVersion = async (name, tags) => {
     try {
       const data = await loadFromS3(name)
       if (data) {
         loadData(data)
         setCurrentSaveName(name)
+        setCurrentSaveTags(tags || [])
         showSnackbar(`Loaded "${name}"`)
       }
     } catch (err) {
@@ -127,6 +141,8 @@ function App() {
         onConfirm={handleConfirmSave}
         onCancel={() => setSaveNameOpen(false)}
         defaultName={currentSaveName}
+        defaultTags={saveModalTags.defaultTags}
+        allTags={saveModalTags.allTags}
       />
       <SavesModal
         isOpen={savesOpen}
