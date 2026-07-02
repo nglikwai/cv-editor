@@ -12,7 +12,7 @@ export const Certifications = ({ certifications, updateField }) => {
   const itemsToRender = showEmpty ? [...certifications, { title: '', issuer: '' }] : certifications
 
   return (
-    <div className="cv-section py-4 px-8">
+    <div className="cv-section pt-4 pb-1 px-8">
       <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
         <span className="shrink-0">Certifications & Affiliations</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />

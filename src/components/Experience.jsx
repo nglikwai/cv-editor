@@ -119,7 +119,7 @@ export const Experience = ({ experience, updateField }) => {
     : experience
 
   return (
-    <div className="cv-section py-4 px-8">
+    <div className="cv-section pt-4 pb-1 px-8">
       <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
         <span className="shrink-0">Professional Experience</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />
@@ -132,7 +132,7 @@ export const Experience = ({ experience, updateField }) => {
           const lastStr = getHighlightString(highlights[highlights.length - 1])
           const showEmptyHighlight = highlights.length > 0 && lastStr?.trim()
           const highlightsToRender = showEmptyHighlight ? [...highlights, ''] : highlights
-          const isPageBreak = expIndex === 1 || expIndex === 3
+          const isPageBreak = false
 
           const roleId = `role-${expIndex}`
           const dateId = `date-${expIndex}`
@@ -218,7 +218,7 @@ export const Experience = ({ experience, updateField }) => {
 
                   {/* Highlights */}
                   {highlightsToRender.length > 0 && (
-                    <ul className="mt-2 space-y-2">
+                    <ul className="mt-3 space-y-2.5">
                       {highlightsToRender.map((highlight, hIndex) => {
                         const isTrailer = hIndex >= highlights.length
                         const id = `${expIndex}-${hIndex}`
@@ -228,7 +228,7 @@ export const Experience = ({ experience, updateField }) => {
                           <li
                             key={hIndex}
                             className={[
-                              "pl-4 relative text-[10.5pt] text-text-dark leading-[1.6]",
+                              "pl-4 relative text-[10.5pt] text-text-dark leading-[1.15]",
                               "before:content-['▸'] before:absolute before:left-0 before:top-0 before:text-golden-yellow before:text-[10.5pt]",
                               isTrailer ? 'print:hidden' : '',
                             ].filter(Boolean).join(' ')}

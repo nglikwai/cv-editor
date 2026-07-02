@@ -40,7 +40,7 @@ export const Summary = ({ summary, updateField }) => {
         <span className="shrink-0">Professional Summary</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
-      <div className="text-[14px] text-text-dark leading-[1.6]">
+      <div className="text-[14px] text-text-dark leading-[1.3]">
         {editing ? (
           <textarea
             ref={editRef}

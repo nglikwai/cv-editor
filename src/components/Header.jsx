@@ -6,7 +6,7 @@ export const Header = ({ basics, updateField }) => {
   const { name, headline, contacts, location, workAuthorization, driving, travel } = basics
 
   return (
-    <div className="cv-header bg-deep-blue text-white py-10 px-8">
+    <div className="cv-header bg-deep-blue text-white py-6 px-8">
       <div className="text-3xl font-black text-white mb-1 tracking-[0.12em] uppercase">
         <EditableInput
           value={name?.full}
