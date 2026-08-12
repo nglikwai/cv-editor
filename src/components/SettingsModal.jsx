@@ -13,22 +13,46 @@ export const DEFAULT_SETTINGS = {
     'border-light': '#e2e8f0',
   },
   templateLayout: {
-    textSize: 14,
-    lineHeight: 1.5,
-    sectionSpacing: 16,
-    jobSpacing: 24,
-    jobItemSpacing: 8,
+    textSize: 13,
+    lineHeight: 1.4,
+    sectionSpacing: 12,
+    jobSpacing: 16,
+    jobItemSpacing: 5,
+    headerPaddingY: 24,
+    experienceFocusSpacingY: 5,
+    certificationSpacing: 16,
+    skillSpacing: 16,
   },
   aiPromptTemplate: `I want to ask you to help me improve my CV. Here is my current CV data:\n\n{cv_json}`,
 }
+
+export const TEMPLATE_LAYOUT_DEFAULTS = {
+  classic: { ...DEFAULT_SETTINGS.templateLayout },
+  modern: {
+    textSize: 14,
+    lineHeight: 1.3,
+    sectionSpacing: 14,
+    jobSpacing: 24,
+    jobItemSpacing: 10,
+    headerPaddingY: 24,
+    experienceFocusSpacingY: 8,
+    certificationSpacing: 2,
+    skillSpacing: 8,
+  },
+}
+
+export const getTemplateLayoutDefaults = (templateId = 'classic') => (
+  TEMPLATE_LAYOUT_DEFAULTS[templateId] || TEMPLATE_LAYOUT_DEFAULTS.classic
+)
 
 const clampNumber = (value, min, max, fallback) => {
   const number = Number(value)
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback
 }
 
-export const normalizeSettings = (settings = {}) => {
+export const normalizeSettings = (settings = {}, templateId = 'classic') => {
   const layout = settings.templateLayout || {}
+  const layoutDefaults = getTemplateLayoutDefaults(templateId)
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
@@ -37,11 +61,15 @@ export const normalizeSettings = (settings = {}) => {
       ...(settings.themeColors || {}),
     },
     templateLayout: {
-      textSize: clampNumber(layout.textSize, 11, 18, DEFAULT_SETTINGS.templateLayout.textSize),
-      lineHeight: clampNumber(layout.lineHeight, 1.2, 2, DEFAULT_SETTINGS.templateLayout.lineHeight),
-      sectionSpacing: clampNumber(layout.sectionSpacing, 8, 32, DEFAULT_SETTINGS.templateLayout.sectionSpacing),
-      jobSpacing: clampNumber(layout.jobSpacing, 8, 48, DEFAULT_SETTINGS.templateLayout.jobSpacing),
-      jobItemSpacing: clampNumber(layout.jobItemSpacing, 0, 24, DEFAULT_SETTINGS.templateLayout.jobItemSpacing),
+      textSize: clampNumber(layout.textSize, 11, 18, layoutDefaults.textSize),
+      lineHeight: clampNumber(layout.lineHeight, 1.2, 2, layoutDefaults.lineHeight),
+      sectionSpacing: clampNumber(layout.sectionSpacing, 8, 32, layoutDefaults.sectionSpacing),
+      jobSpacing: clampNumber(layout.jobSpacing, 8, 48, layoutDefaults.jobSpacing),
+      jobItemSpacing: clampNumber(layout.jobItemSpacing, 0, 24, layoutDefaults.jobItemSpacing),
+      headerPaddingY: clampNumber(layout.headerPaddingY, 8, 64, layoutDefaults.headerPaddingY),
+      experienceFocusSpacingY: clampNumber(layout.experienceFocusSpacingY, 0, 24, layoutDefaults.experienceFocusSpacingY),
+      certificationSpacing: clampNumber(layout.certificationSpacing, 0, 32, layoutDefaults.certificationSpacing),
+      skillSpacing: clampNumber(layout.skillSpacing, 0, 32, layoutDefaults.skillSpacing),
     },
   }
 }
@@ -89,6 +117,10 @@ export const applyTemplateLayout = (templateLayout) => {
   root.style.setProperty('--cv-section-spacing', `${layout.sectionSpacing}px`)
   root.style.setProperty('--cv-job-spacing', `${layout.jobSpacing}px`)
   root.style.setProperty('--cv-job-item-spacing', `${layout.jobItemSpacing}px`)
+  root.style.setProperty('--cv-header-padding-y', `${layout.headerPaddingY}px`)
+  root.style.setProperty('--cv-experience-focus-spacing-y', `${layout.experienceFocusSpacingY}px`)
+  root.style.setProperty('--cv-certification-spacing', `${layout.certificationSpacing}px`)
+  root.style.setProperty('--cv-skill-spacing', `${layout.skillSpacing}px`)
 }
 
 const LayoutControl = ({ label, value, min, max, step, suffix = '', onChange }) => (
@@ -120,6 +152,18 @@ const LayoutControl = ({ label, value, min, max, step, suffix = '', onChange }) 
   </label>
 )
 
+const LayoutGroup = ({ title, description, children }) => (
+  <section className="rounded-xl border border-gray-100 overflow-hidden">
+    <div className="px-3.5 py-3 bg-gray-50/80 border-b border-gray-100">
+      <h4 className="text-xs font-semibold text-text-dark">{title}</h4>
+      {description && <p className="text-[11px] text-text-light mt-0.5">{description}</p>}
+    </div>
+    <div className="p-2.5 flex flex-col gap-2.5 bg-white">
+      {children}
+    </div>
+  </section>
+)
+
 const ColorSwatch = ({ colorKey, value, onChange }) => (
   <label className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer group">
     <div className="relative shrink-0">
@@ -141,42 +185,59 @@ const ColorSwatch = ({ colorKey, value, onChange }) => (
   </label>
 )
 
-export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
+export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templateId = 'classic', onPreview, onSave }) => {
   const [localSettings, setLocalSettings] = useState(settings)
 
   useEffect(() => {
     if (isOpen) {
-      setLocalSettings(normalizeSettings(settings))
+      setLocalSettings(normalizeSettings(settings, templateId))
     }
-  }, [isOpen, settings])
+  }, [isOpen, settings, templateId])
+
+  useEffect(() => {
+    if (!isOpen || !visible) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, visible, onClose])
 
   if (!isOpen) return null
 
+  const updateWithPreview = (updater) => {
+    setLocalSettings((prev) => {
+      const next = updater(prev)
+      onPreview?.(normalizeSettings(next, templateId))
+      return next
+    })
+  }
+
   const handleColorChange = (key, value) => {
-    setLocalSettings((prev) => ({
+    updateWithPreview((prev) => ({
       ...prev,
       themeColors: { ...prev.themeColors, [key]: value },
     }))
   }
 
   const handleResetColors = () => {
-    setLocalSettings((prev) => ({
+    updateWithPreview((prev) => ({
       ...prev,
       themeColors: { ...DEFAULT_SETTINGS.themeColors },
     }))
   }
 
   const handleLayoutChange = (key, value) => {
-    setLocalSettings((prev) => ({
+    updateWithPreview((prev) => ({
       ...prev,
       templateLayout: { ...prev.templateLayout, [key]: value },
     }))
   }
 
   const handleResetLayout = () => {
-    setLocalSettings((prev) => ({
+    updateWithPreview((prev) => ({
       ...prev,
-      templateLayout: { ...DEFAULT_SETTINGS.templateLayout },
+      templateLayout: { ...getTemplateLayoutDefaults(templateId) },
     }))
   }
 
@@ -188,16 +249,16 @@ export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
   }
 
   const colors = localSettings.themeColors
-  const layout = localSettings.templateLayout || DEFAULT_SETTINGS.templateLayout
+  const layout = localSettings.templateLayout || getTemplateLayoutDefaults(templateId)
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] print:hidden">
-      <div className="bg-white rounded-2xl shadow-2xl w-[90%] max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className={`fixed inset-0 z-[2000] pointer-events-none print:hidden ${visible ? '' : 'hidden'}`}>
+      <aside className="left-settings-drawer pointer-events-auto absolute top-16 bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-[420px] max-w-[calc(100vw-1rem)] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
           <div>
-            <h2 className="text-lg font-semibold text-deep-blue">Settings</h2>
-            <p className="text-xs text-text-light mt-0.5">Customize template, theme and AI behavior</p>
+            <h2 className="text-lg font-semibold text-deep-blue">Theme Settings</h2>
+            <p className="text-xs text-text-light mt-0.5">Changes preview instantly on your CV.</p>
           </div>
           <button
             onClick={onClose}
@@ -233,7 +294,7 @@ export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
               {COLOR_GROUPS.map((group) => (
                 <div key={group.label}>
                   <span className="text-[11px] font-medium text-text-light uppercase tracking-wider mb-2 block">{group.label}</span>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {group.keys.map((key) => (
                       <ColorSwatch
                         key={key}
@@ -255,8 +316,10 @@ export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-semibold text-deep-blue">Template Layout</h3>
-                <p className="text-xs text-text-light mt-0.5">Applied to the editor and PDF output.</p>
+                <h3 className="text-sm font-semibold text-deep-blue">
+                  {templateId.charAt(0).toUpperCase() + templateId.slice(1)} Template Layout
+                </h3>
+                <p className="text-xs text-text-light mt-0.5">Saved with this CV and applied to its PDF output.</p>
               </div>
               <button
                 onClick={handleResetLayout}
@@ -265,51 +328,104 @@ export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
                 Reset
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <LayoutControl
-                label="Text size"
-                value={layout.textSize}
-                min={11}
-                max={18}
-                step={0.5}
-                suffix="px"
-                onChange={(value) => handleLayoutChange('textSize', value)}
-              />
-              <LayoutControl
-                label="Body line height"
-                value={layout.lineHeight}
-                min={1.2}
-                max={2}
-                step={0.05}
-                onChange={(value) => handleLayoutChange('lineHeight', value)}
-              />
-              <LayoutControl
-                label="Section spacing"
-                value={layout.sectionSpacing}
-                min={8}
-                max={32}
-                step={1}
-                suffix="px"
-                onChange={(value) => handleLayoutChange('sectionSpacing', value)}
-              />
-              <LayoutControl
-                label="Spacing between jobs"
-                value={layout.jobSpacing}
-                min={8}
-                max={48}
-                step={1}
-                suffix="px"
-                onChange={(value) => handleLayoutChange('jobSpacing', value)}
-              />
-              <LayoutControl
-                label="Spacing between job items"
-                value={layout.jobItemSpacing}
-                min={0}
-                max={24}
-                step={1}
-                suffix="px"
-                onChange={(value) => handleLayoutChange('jobItemSpacing', value)}
-              />
+            <div className="flex flex-col gap-3">
+              <LayoutGroup title="Typography" description="Applies across the entire CV.">
+                <LayoutControl
+                  label="Text size"
+                  value={layout.textSize}
+                  min={11}
+                  max={18}
+                  step={0.5}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('textSize', value)}
+                />
+                <LayoutControl
+                  label="Body line height"
+                  value={layout.lineHeight}
+                  min={1.2}
+                  max={2}
+                  step={0.05}
+                  onChange={(value) => handleLayoutChange('lineHeight', value)}
+                />
+              </LayoutGroup>
+
+              <LayoutGroup title="Header" description="The first area at the top of the CV.">
+                <LayoutControl
+                  label="Vertical padding"
+                  value={layout.headerPaddingY}
+                  min={8}
+                  max={64}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('headerPaddingY', value)}
+                />
+              </LayoutGroup>
+
+              <LayoutGroup title="Sections" description="Controls the flow between major CV sections.">
+                <LayoutControl
+                  label="Section spacing"
+                  value={layout.sectionSpacing}
+                  min={8}
+                  max={32}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('sectionSpacing', value)}
+                />
+              </LayoutGroup>
+
+              <LayoutGroup title="Experience" description="Ordered from each job down to its details.">
+                <LayoutControl
+                  label="Between jobs"
+                  value={layout.jobSpacing}
+                  min={8}
+                  max={48}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('jobSpacing', value)}
+                />
+                <LayoutControl
+                  label="Around focus text"
+                  value={layout.experienceFocusSpacingY}
+                  min={0}
+                  max={24}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('experienceFocusSpacingY', value)}
+                />
+                <LayoutControl
+                  label="Between achievement items"
+                  value={layout.jobItemSpacing}
+                  min={0}
+                  max={24}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('jobItemSpacing', value)}
+                />
+              </LayoutGroup>
+
+              <LayoutGroup title="Skills" description="Controls the expertise and technology category rows.">
+                <LayoutControl
+                  label="Between skill groups"
+                  value={layout.skillSpacing}
+                  min={0}
+                  max={32}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('skillSpacing', value)}
+                />
+              </LayoutGroup>
+
+              <LayoutGroup title="Certifications" description="Controls qualifications and affiliation entries.">
+                <LayoutControl
+                  label="Between certifications"
+                  value={layout.certificationSpacing}
+                  min={0}
+                  max={32}
+                  step={1}
+                  suffix="px"
+                  onChange={(value) => handleLayoutChange('certificationSpacing', value)}
+                />
+              </LayoutGroup>
             </div>
           </div>
 
@@ -324,7 +440,8 @@ export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
             <textarea
               value={localSettings.aiPromptTemplate}
               onChange={(e) => handlePromptChange(e.target.value)}
-              className="w-full h-28 p-3 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-light-blue/40 focus:border-light-blue transition-shadow bg-gray-50 font-mono leading-relaxed"
+              rows={30}
+              className="w-full min-h-64 p-3 text-sm border border-gray-200 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-light-blue/40 focus:border-light-blue transition-shadow bg-gray-50 font-mono leading-relaxed"
             />
           </div>
         </div>
@@ -338,13 +455,13 @@ export const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
             Cancel
           </button>
           <button
-            onClick={() => onSave(normalizeSettings(localSettings))}
+            onClick={() => onSave(localSettings)}
             className="px-5 py-2 border-none rounded-lg cursor-pointer text-sm font-medium transition-all duration-200 bg-deep-blue text-white hover:bg-light-blue shadow-sm"
           >
             Save Settings
           </button>
         </div>
-      </div>
+      </aside>
     </div>
   )
 }

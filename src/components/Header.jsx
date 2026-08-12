@@ -1,30 +1,38 @@
-import { EditableInput } from './EditableInput'
+import { EditableInput, EditableTextarea } from './EditableInput'
 
-export const Header = ({ basics, updateField }) => {
+export const Header = ({ basics, updateField, multilineHeadline = false }) => {
   if (!basics) return null
 
   const { name, headline, contacts, location, workAuthorization, driving, travel } = basics
 
   return (
     <div className="cv-header bg-deep-blue text-white py-10 px-8">
-      <div className="cv-text-title text-3xl font-black text-white mb-1 tracking-[0.12em] uppercase">
+      <div className="cv-header-name cv-text-title text-3xl font-black text-white mb-1 tracking-[0.12em] uppercase">
         <EditableInput
           value={name?.full}
           onChange={(v) => updateField('basics.name.full', v)}
           className="cv-text-title text-3xl font-black tracking-[0.12em] uppercase text-white"
         />
       </div>
-      <div className="flex items-center gap-2.5 mb-4">
-        <span className="w-6 h-px bg-golden-yellow shrink-0" />
-        <div className="cv-configurable-text cv-text-base text-sm text-golden-yellow font-medium tracking-wider">
-          <EditableInput
-            value={headline}
-            onChange={(v) => updateField('basics.headline', v)}
-            className="text-golden-yellow font-medium tracking-wider"
-          />
+      <div className="cv-headline-row flex items-center gap-2.5 mb-4">
+        <span className="cv-headline-rule w-6 h-px bg-golden-yellow shrink-0" />
+        <div className="cv-header-headline flex-1 min-w-0 w-full cv-configurable-text cv-text-base text-sm text-golden-yellow font-medium tracking-wider">
+          {multilineHeadline ? (
+            <EditableTextarea
+              value={headline}
+              onChange={(v) => updateField('basics.headline', v)}
+              className="block w-full text-golden-yellow font-medium tracking-wider leading-snug"
+            />
+          ) : (
+            <EditableInput
+              value={headline}
+              onChange={(v) => updateField('basics.headline', v)}
+              className="text-golden-yellow font-medium tracking-wider"
+            />
+          )}
         </div>
       </div>
-      <div className="cv-configurable-text cv-text-base flex flex-wrap gap-y-1 gap-x-5 text-sm text-slate-200">
+      <div className="cv-header-contacts cv-configurable-text cv-text-base flex flex-wrap gap-y-1 gap-x-5 text-sm text-slate-200">
         <div className="flex items-center gap-1.5">
           <svg
             className="w-3.5 h-3.5 text-golden-yellow shrink-0"
@@ -98,22 +106,22 @@ export const Header = ({ basics, updateField }) => {
         </div>
       </div>
       {(workAuthorization?.length > 0 || driving?.notes || travel?.notes) && (
-        <div className="cv-configurable-text cv-text-small flex flex-wrap gap-x-3 text-xs text-slate-300 mt-2 pt-2 border-t border-white/20">
+        <div className="cv-meta-row cv-configurable-text cv-text-small flex flex-wrap gap-x-3 text-xs text-slate-300 mt-2 pt-2 border-t border-white/20">
           {workAuthorization?.map((auth, i) => (
             <span
               key={i}
-              className="inline-flex items-center before:content-[''] before:w-1 before:h-1 before:bg-golden-yellow before:rounded-full before:mr-1.5"
+              className="cv-meta-item inline-flex items-center before:content-[''] before:w-1 before:h-1 before:bg-golden-yellow before:rounded-full before:mr-1.5"
             >
               {auth}
             </span>
           ))}
           {driving?.notes && (
-            <span className="inline-flex items-center before:content-[''] before:w-1 before:h-1 before:bg-golden-yellow before:rounded-full before:mr-1.5">
+            <span className="cv-meta-item inline-flex items-center before:content-[''] before:w-1 before:h-1 before:bg-golden-yellow before:rounded-full before:mr-1.5">
               {driving.notes}
             </span>
           )}
           {travel?.notes && (
-            <span className="inline-flex items-center before:content-[''] before:w-1 before:h-1 before:bg-golden-yellow before:rounded-full before:mr-1.5">
+            <span className="cv-meta-item inline-flex items-center before:content-[''] before:w-1 before:h-1 before:bg-golden-yellow before:rounded-full before:mr-1.5">
               {travel.notes}
             </span>
           )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { cvToMarkdown } from '../utils/cvToMarkdown'
 
-export const JsonEditorModal = ({ isOpen, onClose, cvData, onConfirm, showSnackbar }) => {
+export const JsonEditorModal = ({ isOpen, visible = true, onClose, cvData, onConfirm, showSnackbar }) => {
   const [jsonText, setJsonText] = useState('')
   const [markdownText, setMarkdownText] = useState('')
   const [view, setView] = useState('json')
@@ -15,6 +15,15 @@ export const JsonEditorModal = ({ isOpen, onClose, cvData, onConfirm, showSnackb
       setError('')
     }
   }, [isOpen, cvData])
+
+  useEffect(() => {
+    if (!isOpen || !visible) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, visible, onClose])
 
   const handleConfirm = () => {
     try {
@@ -64,8 +73,8 @@ export const JsonEditorModal = ({ isOpen, onClose, cvData, onConfirm, showSnackb
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] print:hidden">
-      <div className="bg-white rounded-lg shadow-xl w-[90%] max-w-4xl h-[90vh] flex flex-col">
+    <div className={`fixed inset-0 z-[2000] pointer-events-none print:hidden ${visible ? '' : 'hidden'}`}>
+      <aside className="left-settings-drawer pointer-events-auto absolute top-16 bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-[640px] max-w-[calc(100vw-1rem)] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-semibold text-deep-blue">CV Data</h2>
@@ -117,7 +126,7 @@ export const JsonEditorModal = ({ isOpen, onClose, cvData, onConfirm, showSnackb
           />
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-wrap justify-between gap-3">
           {view === 'json' ? (
             <button
               onClick={handlePaste}
@@ -148,7 +157,7 @@ export const JsonEditorModal = ({ isOpen, onClose, cvData, onConfirm, showSnackb
             </button>
           </div>
         </div>
-      </div>
+      </aside>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { FiColumns, FiEdit3, FiFileText, FiMoon, FiSun } from 'react-icons/fi'
+import { FiColumns, FiEdit3, FiFileText, FiLayout, FiMoon, FiSun } from 'react-icons/fi'
 
 const NavButton = ({ active, icon, label, onClick }) => (
   <button
@@ -23,6 +23,9 @@ export const AppLayout = ({
   onNavigateEditor,
   darkMode,
   onToggleDarkMode,
+  templateId,
+  templates = [],
+  onTemplateChange,
   children,
 }) => (
   <div className={`app-shell ${darkMode ? 'dark-ui' : ''} min-h-screen h-screen flex flex-col bg-[var(--app-canvas)] text-text-dark print:h-auto print:min-h-0 print:block print:bg-white`}>
@@ -54,6 +57,23 @@ export const AppLayout = ({
         </nav>
 
         <div className="flex-1" />
+
+        {activePage === 'editor' && templates.length > 0 && (
+          <label className="h-9 flex items-center gap-2 px-2.5 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
+            <FiLayout size={15} />
+            <span className="hidden lg:inline text-[10px] uppercase tracking-wider font-semibold">Template</span>
+            <select
+              value={templateId}
+              onChange={(event) => onTemplateChange?.(event.target.value)}
+              className="bg-transparent text-xs font-semibold text-text-dark focus:outline-none cursor-pointer"
+              aria-label="CV template"
+            >
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <button
           type="button"

@@ -21,6 +21,7 @@ const SETTINGS_KEY = 'willcv/settings.json'
 const TAGS_KEY = 'willcv/tags.json'
 const BOARD_KEY = 'willcv/board.json'
 const VERSIONS_FOLDER = `${FOLDER}/versions`
+const NO_CACHE = 'no-store, no-cache, must-revalidate, max-age=0'
 
 export const DEFAULT_BOARD_COLUMNS = [
   { id: 'archived', title: 'Archived', color: '#94a3b8' },
@@ -44,7 +45,7 @@ const versionKey = (name, versionId) => `${versionPrefix(name)}${encodeURICompon
 
 const loadTags = async () => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: TAGS_KEY })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: TAGS_KEY, ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     return JSON.parse(text)
@@ -60,6 +61,7 @@ const saveTags = async (tags) => {
     Key: TAGS_KEY,
     Body: JSON.stringify(tags, null, 2),
     ContentType: 'application/json',
+    CacheControl: NO_CACHE,
   })
   await s3Client.send(command)
 }
@@ -95,7 +97,7 @@ export const listSaves = async () => {
 
 export const loadFromS3 = async (name) => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: cvKey(name) })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: cvKey(name), ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     return JSON.parse(text)
@@ -128,6 +130,7 @@ export const loadVersionFromS3 = async (name, versionId) => {
     const command = new GetObjectCommand({
       Bucket: BUCKET,
       Key: versionKey(name, versionId),
+      ResponseCacheControl: NO_CACHE,
     })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
@@ -193,6 +196,7 @@ export const saveToS3 = async (data, name, tags = [], createVersion = true) => {
       Key: versionKey(name, versionId),
       Body: body,
       ContentType: 'application/json',
+      CacheControl: NO_CACHE,
     })
     await s3Client.send(versionCommand)
   }
@@ -202,6 +206,7 @@ export const saveToS3 = async (data, name, tags = [], createVersion = true) => {
     Key: cvKey(name),
     Body: body,
     ContentType: 'application/json',
+    CacheControl: NO_CACHE,
   })
   await s3Client.send(command)
 
@@ -216,7 +221,7 @@ export const saveToS3 = async (data, name, tags = [], createVersion = true) => {
 
 export const loadSettings = async () => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: SETTINGS_KEY })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: SETTINGS_KEY, ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     return JSON.parse(text)
@@ -232,13 +237,14 @@ export const saveSettings = async (data) => {
     Key: SETTINGS_KEY,
     Body: JSON.stringify(data, null, 2),
     ContentType: 'application/json',
+    CacheControl: NO_CACHE,
   })
   await s3Client.send(command)
 }
 
 export const loadBoard = async () => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: BOARD_KEY })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: BOARD_KEY, ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     const data = JSON.parse(text)
@@ -271,6 +277,7 @@ export const saveBoard = async (board) => {
     Key: BOARD_KEY,
     Body: JSON.stringify(board, null, 2),
     ContentType: 'application/json',
+    CacheControl: NO_CACHE,
   })
   await s3Client.send(command)
 }

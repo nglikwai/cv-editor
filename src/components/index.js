@@ -8,7 +8,7 @@ export { Certifications } from './Certifications'
 export { Education } from './Education'
 export { Languages } from './Languages'
 export { Toolbar } from './Toolbar'
-export { CVPage } from './CVPage'
+export { CVPage, CV_TEMPLATES } from './CVPage'
 export { AppLayout } from './AppLayout'
 export { BoardDashboard } from './BoardDashboard'
 export { NewCVModal } from './NewCVModal'
@@ -18,5 +18,7 @@ export {
   DEFAULT_SETTINGS,
   applyTemplateLayout,
   applyThemeColors,
+  getTemplateLayoutDefaults,
   normalizeSettings,
+  TEMPLATE_LAYOUT_DEFAULTS,
 } from './SettingsModal'

@@ -72,7 +72,7 @@ export const cvToMarkdown = (cv = {}) => {
   }
 
   const knownKeys = new Set([
-    'meta', 'basics', 'summary', 'skills', 'experience', 'education', 'languages',
+    'meta', 'presentation', 'basics', 'summary', 'skills', 'experience', 'education', 'languages',
     'certificationsAndAffiliations', 'sectionsOrder', 'notes',
   ])
   Object.entries(cv).forEach(([key, value]) => {

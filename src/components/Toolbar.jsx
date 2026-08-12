@@ -1,4 +1,4 @@
-import { FiClock, FiCloud, FiEdit, FiPrinter, FiSave, FiSettings } from 'react-icons/fi'
+import { FiClock, FiCloud, FiEdit, FiEye, FiPrinter, FiSave, FiSettings } from 'react-icons/fi'
 import { RiRobot2Line } from 'react-icons/ri'
 
 const ToolbarButton = ({ onClick, disabled, label, pressed, children }) => {
@@ -26,9 +26,13 @@ const Divider = () => (
 export const Toolbar = ({
   onSave,
   onExportPDF,
+  printPreview,
+  onTogglePrintPreview,
   onEditJson,
+  jsonEditorOpen,
   onAI,
   onSettings,
+  settingsOpen,
   onVersions,
   versionsDisabled,
   saving,
@@ -53,7 +57,11 @@ export const Toolbar = ({
       <ToolbarButton onClick={onVersions} disabled={versionsDisabled} label="Saved Versions">
         <FiClock />
       </ToolbarButton>
-      <ToolbarButton onClick={onEditJson} label="Edit JSON">
+      <ToolbarButton
+        onClick={onEditJson}
+        pressed={jsonEditorOpen}
+        label={`${jsonEditorOpen ? 'Close' : 'Open'} JSON Editor`}
+      >
         <FiEdit />
       </ToolbarButton>
 
@@ -62,13 +70,24 @@ export const Toolbar = ({
       <ToolbarButton onClick={onExportPDF} label="Export PDF">
         <FiPrinter />
       </ToolbarButton>
+      <ToolbarButton
+        onClick={onTogglePrintPreview}
+        pressed={printPreview}
+        label={`A4 Page Preview: ${printPreview ? 'On' : 'Off'}`}
+      >
+        <FiEye />
+      </ToolbarButton>
       <ToolbarButton onClick={onAI} label="AI Assistant">
         <RiRobot2Line />
       </ToolbarButton>
 
       <Divider />
 
-      <ToolbarButton onClick={onSettings} label="Settings">
+      <ToolbarButton
+        onClick={onSettings}
+        pressed={settingsOpen}
+        label={`${settingsOpen ? 'Close' : 'Open'} Theme Settings`}
+      >
         <FiSettings />
       </ToolbarButton>
     </div>

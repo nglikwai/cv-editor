@@ -9,8 +9,6 @@ export const Skills = ({ skills, updateField }) => {
   if (!skills?.core?.length) return null
 
   const coreSkills = skills.core
-  const showEmpty = coreSkills[coreSkills.length - 1]?.trim()
-  const itemsToRender = showEmpty ? [...coreSkills, ''] : coreSkills
 
   return (
     <div className="cv-section py-3 px-8">
@@ -19,13 +17,12 @@ export const Skills = ({ skills, updateField }) => {
         <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
       <div className="flex flex-wrap gap-1.5">
-        {itemsToRender.map((skill, index) => (
-          <span key={index} className={`inline-flex items-center bg-deep-blue/5 py-0.5 px-2.5 rounded-full border border-golden-yellow/40 text-xs font-medium text-text-dark${index >= coreSkills.length ? ' print:hidden' : ''}`}>
+        {coreSkills.map((skill, index) => (
+          <span key={index} className="inline-flex items-center bg-deep-blue/5 py-0.5 px-2.5 rounded-full border border-golden-yellow/40 text-xs font-medium text-text-dark">
             <EditableInput
               value={skill}
               onChange={(v) => handleSkillChange(index, v)}
               className="text-xs w-auto min-w-8 bg-transparent font-medium"
-              placeholder={index >= coreSkills.length ? 'Add skill...' : ''}
             />
           </span>
         ))}

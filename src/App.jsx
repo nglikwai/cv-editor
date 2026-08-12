@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { Toolbar } from './components/Toolbar'
 import { AppLayout } from './components/AppLayout'
-import { CVPage } from './components/CVPage'
+import { CVPage, CV_TEMPLATES } from './components/CVPage'
 import { BoardDashboard } from './components/BoardDashboard'
 import { JsonEditorModal } from './components/JsonEditorModal'
 import { SaveNameModal } from './components/SaveNameModal'
@@ -11,6 +12,7 @@ import {
   DEFAULT_SETTINGS,
   applyTemplateLayout,
   applyThemeColors,
+  getTemplateLayoutDefaults,
   normalizeSettings,
 } from './components/SettingsModal'
 import { useCVData } from './hooks/useCVData'
@@ -97,9 +99,114 @@ function App() {
   const [darkMode, setDarkMode] = useState(loadDarkMode)
   const [autoSave, setAutoSave] = useState(loadAutoSave)
   const [autoSaving, setAutoSaving] = useState(false)
+  const [printPreview, setPrintPreview] = useState(true)
   const [unsavedDraft, setUnsavedDraft] = useState(loadUnsavedDraft)
   const autoSaveBaselineRef = useRef({ name: null, snapshot: JSON.stringify(initialData) })
   const autoSaveQueueRef = useRef(Promise.resolve())
+  const autoSaveTimerRef = useRef(null)
+  const previewCenteredRef = useRef(false)
+  const requestedTemplateId = cvData.presentation?.templateId || 'modern'
+  const normalizedTemplateId = requestedTemplateId === 'simple' ? 'classic' : requestedTemplateId
+  const activeTemplateId = CV_TEMPLATES.some((template) => template.id === normalizedTemplateId)
+    ? normalizedTemplateId
+    : 'classic'
+  const effectiveThemeColors = useMemo(() => ({
+    ...settings.themeColors,
+    ...(cvData.presentation?.themeColors || {}),
+  }), [settings.themeColors, cvData.presentation?.themeColors])
+  const effectiveTemplateLayout = useMemo(() => ({
+    ...getTemplateLayoutDefaults(activeTemplateId),
+    ...(Object.keys(cvData.presentation?.templateSettings || {}).length === 0
+      ? cvData.presentation?.layout || {}
+      : {}),
+    ...(requestedTemplateId === 'simple'
+      ? cvData.presentation?.templateSettings?.simple?.layout || {}
+      : {}),
+    ...(cvData.presentation?.templateSettings?.[activeTemplateId]?.layout || {}),
+  }), [
+    activeTemplateId,
+    requestedTemplateId,
+    cvData.presentation?.layout,
+    cvData.presentation?.templateSettings,
+  ])
+  const effectiveEditorSettings = useMemo(() => ({
+    ...settings,
+    themeColors: effectiveThemeColors,
+    templateLayout: effectiveTemplateLayout,
+  }), [settings, effectiveThemeColors, effectiveTemplateLayout])
+
+  useEffect(() => {
+    if (requestedTemplateId !== 'simple') return
+
+    const simpleLayout = cvData.presentation?.templateSettings?.simple?.layout
+    const classicLayout = cvData.presentation?.templateSettings?.classic?.layout
+    if (simpleLayout && !classicLayout) {
+      updateField('presentation.templateSettings.classic.layout', simpleLayout)
+    }
+    updateField('presentation.templateId', 'classic')
+  }, [requestedTemplateId, cvData.presentation?.templateSettings, updateField])
+
+  useLayoutEffect(() => {
+    if (!printPreview || boardOpen || routeLoading) return undefined
+
+    const cvElement = document.getElementById('cv-content')
+    if (!cvElement) return undefined
+    const previewStage = cvElement.closest('.page-preview-stage')
+    if (!previewStage) return undefined
+
+    let frameId
+    const sizePageBackground = () => {
+      // Reset before measuring so an earlier, wider preview cannot keep the
+      // scroll area open after content is removed.
+      cvElement.style.setProperty('--preview-pages-width', '210mm')
+      const containerRect = cvElement.getBoundingClientRect()
+      const pageWidth = containerRect.width
+      const columnGap = Number.parseFloat(getComputedStyle(cvElement).columnGap) || 0
+      const columnStep = pageWidth + columnGap
+      let contentRight = containerRect.left
+
+      cvElement.querySelectorAll('*').forEach((element) => {
+        Array.from(element.getClientRects()).forEach((rect) => {
+          if (rect.width > 0 && rect.height > 0) {
+            contentRight = Math.max(contentRight, rect.right)
+          }
+        })
+      })
+
+      // Subtracting one pixel keeps an element ending exactly at a page edge
+      // from being rounded into an extra empty column.
+      const occupiedWidth = Math.max(0, contentRight - containerRect.left - 1)
+      const pageCount = Math.max(1, Math.floor(occupiedWidth / columnStep) + 1)
+      const previewWidth = (pageCount * pageWidth) + ((pageCount - 1) * columnGap)
+      const viewportWidth = previewStage.parentElement.clientWidth
+      const pageHeight = pageWidth * (297 / 210)
+      const stageWidth = previewWidth + viewportWidth
+
+      cvElement.style.setProperty('--preview-pages-width', `${previewWidth}px`)
+      previewStage.style.setProperty('--preview-stage-width', `${stageWidth}px`)
+      previewStage.style.setProperty('--preview-stage-height', `${pageHeight}px`)
+      previewStage.style.setProperty('--preview-side-gutter', `${viewportWidth / 2}px`)
+
+      if (!previewCenteredRef.current) {
+        previewStage.parentElement.scrollLeft = previewWidth / 2
+        previewCenteredRef.current = true
+      }
+    }
+
+    sizePageBackground()
+    frameId = requestAnimationFrame(sizePageBackground)
+    const resizeObserver = new ResizeObserver(sizePageBackground)
+    resizeObserver.observe(previewStage.parentElement)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      resizeObserver.disconnect()
+    }
+  }, [printPreview, boardOpen, routeLoading, cvData, effectiveEditorSettings])
+
+  useEffect(() => {
+    if (!printPreview) previewCenteredRef.current = false
+  }, [printPreview])
 
   const showSnackbar = (message, type = 'success') => {
     setSnackbar({ message, type })
@@ -111,6 +218,14 @@ function App() {
       localStorage.setItem(COLOR_MODE_KEY, darkMode ? 'dark' : 'light')
     } catch {
       // Theme persistence is optional when storage is unavailable.
+    }
+
+    document.documentElement.classList.toggle('dark-ui-body', darkMode)
+    document.body.classList.toggle('dark-ui-body', darkMode)
+
+    return () => {
+      document.documentElement.classList.remove('dark-ui-body')
+      document.body.classList.remove('dark-ui-body')
     }
   }, [darkMode])
 
@@ -129,7 +244,8 @@ function App() {
     const baseline = autoSaveBaselineRef.current
     if (baseline.name === currentSaveName && baseline.snapshot === snapshot) return undefined
 
-    const timeout = setTimeout(() => {
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null
       const saveName = currentSaveName
       const saveTags = currentSaveTags
       const saveData = cvData
@@ -150,7 +266,10 @@ function App() {
       autoSaveQueueRef.current = autoSaveQueueRef.current.then(persist, persist)
     }, 1200)
 
-    return () => clearTimeout(timeout)
+    return () => {
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
   }, [autoSave, currentSaveName, currentSaveTags, currentVersionId, cvData, routeLoading, saving])
 
   useEffect(() => {
@@ -191,6 +310,11 @@ function App() {
     }
     loadInitialSettings()
   }, [])
+
+  useEffect(() => {
+    applyThemeColors(effectiveThemeColors)
+    applyTemplateLayout(effectiveTemplateLayout)
+  }, [effectiveThemeColors, effectiveTemplateLayout])
 
   useEffect(() => {
     let routeRequest = 0
@@ -412,22 +536,99 @@ function App() {
   }
 
   const handleExportPDF = () => {
+    if (printPreview) {
+      flushSync(() => setPrintPreview(false))
+    }
     window.print()
   }
 
   const handleSaveSettings = async (newSettings) => {
-    const normalizedSettings = normalizeSettings(newSettings)
-    setSettings(normalizedSettings)
+    const normalizedSettings = normalizeSettings(newSettings, activeTemplateId)
+    const globalSettings = {
+      ...settings,
+      aiPromptTemplate: normalizedSettings.aiPromptTemplate,
+    }
+    const presentation = {
+      ...(cvData.presentation || {}),
+      templateId: activeTemplateId,
+      themeColors: normalizedSettings.themeColors,
+      templateSettings: {
+        ...(cvData.presentation?.templateSettings || {}),
+        [activeTemplateId]: {
+          ...(cvData.presentation?.templateSettings?.[activeTemplateId] || {}),
+          layout: normalizedSettings.templateLayout,
+        },
+      },
+    }
+    delete presentation.layout
+    const updatedCvData = { ...cvData, presentation }
+
+    setSettings(globalSettings)
+    loadData(updatedCvData)
     applyThemeColors(normalizedSettings.themeColors)
     applyTemplateLayout(normalizedSettings.templateLayout)
     setSettingsOpen(false)
+    setSaving(true)
     try {
-      await saveSettings(normalizedSettings)
-      showSnackbar('Settings saved!')
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+
+      // A debounced auto-save may already be running with the previous CV
+      // snapshot. Let it finish before writing settings so it cannot overwrite
+      // the newly selected spacing values afterward.
+      await autoSaveQueueRef.current.catch(() => undefined)
+
+      if (currentSaveName && !currentVersionId) {
+        await saveToS3(updatedCvData, currentSaveName, currentSaveTags, false)
+      }
+      await saveSettings(globalSettings)
+
+      if (currentSaveName && !currentVersionId) {
+        autoSaveBaselineRef.current = {
+          name: currentSaveName,
+          snapshot: JSON.stringify(updatedCvData),
+        }
+        showSnackbar('Theme settings saved to this CV!')
+      } else if (currentVersionId) {
+        showSnackbar('Theme applied. Use Save to replace or create a version.')
+      } else {
+        showSnackbar('Theme applied to this draft!')
+      }
     } catch (err) {
       console.error('Error saving settings:', err)
       showSnackbar('Error saving settings: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
     }
+  }
+
+  const handlePreviewSettings = (previewSettings) => {
+    applyThemeColors(previewSettings.themeColors)
+    applyTemplateLayout(previewSettings.templateLayout)
+  }
+
+  const handleCloseSettings = () => {
+    applyThemeColors(effectiveThemeColors)
+    applyTemplateLayout(effectiveTemplateLayout)
+    setSettingsOpen(false)
+  }
+
+  const handleOpenJsonEditor = () => {
+    if (jsonEditorOpen) {
+      setJsonEditorOpen(false)
+      return
+    }
+    if (settingsOpen) handleCloseSettings()
+    setJsonEditorOpen(true)
+  }
+
+  const handleOpenSettings = () => {
+    if (settingsOpen) {
+      handleCloseSettings()
+      return
+    }
+    setJsonEditorOpen(false)
+    setSettingsOpen(true)
   }
 
   const handleAI = async () => {
@@ -435,6 +636,18 @@ function App() {
     await navigator.clipboard.writeText(prompt)
     showSnackbar('Prompt copied to clipboard!')
     window.open('https://chatgpt.com/', '_blank')
+  }
+
+  const handleTemplateChange = (nextTemplateId) => {
+    if (nextTemplateId === activeTemplateId) return
+
+    const legacyLayout = cvData.presentation?.layout
+    const currentTemplateLayout = cvData.presentation?.templateSettings?.[activeTemplateId]?.layout
+    if (legacyLayout && !currentTemplateLayout) {
+      updateField(`presentation.templateSettings.${activeTemplateId}.layout`, legacyLayout)
+      updateField('presentation.layout', null)
+    }
+    updateField('presentation.templateId', nextTemplateId)
   }
 
   return (
@@ -445,6 +658,9 @@ function App() {
       onNavigateEditor={() => navigateToEditor(currentSaveName)}
       darkMode={darkMode}
       onToggleDarkMode={() => setDarkMode((current) => !current)}
+      templateId={activeTemplateId}
+      templates={CV_TEMPLATES}
+      onTemplateChange={handleTemplateChange}
     >
       {boardOpen ? (
         <BoardDashboard
@@ -462,9 +678,13 @@ function App() {
           <Toolbar
             onSave={handleSave}
             onExportPDF={handleExportPDF}
-            onEditJson={() => setJsonEditorOpen(true)}
+            printPreview={printPreview}
+            onTogglePrintPreview={() => setPrintPreview((current) => !current)}
+            onEditJson={handleOpenJsonEditor}
+            jsonEditorOpen={jsonEditorOpen}
             onAI={handleAI}
-            onSettings={() => setSettingsOpen(true)}
+            onSettings={handleOpenSettings}
+            settingsOpen={settingsOpen}
             onVersions={() => setSavesOpen(true)}
             versionsDisabled={!currentSaveName}
             saving={saving}
@@ -472,13 +692,6 @@ function App() {
             autoSaving={autoSaving}
             autoSaveDisabled={!currentSaveName || !!currentVersionId}
             onToggleAutoSave={() => setAutoSave((current) => !current)}
-          />
-          <JsonEditorModal
-            isOpen={jsonEditorOpen}
-            onClose={() => setJsonEditorOpen(false)}
-            cvData={cvData}
-            onConfirm={loadData}
-            showSnackbar={showSnackbar}
           />
           <SaveNameModal
             isOpen={saveNameOpen}
@@ -496,20 +709,33 @@ function App() {
             currentVersionId={currentVersionId}
             onLoadVersion={handleSelectVersion}
           />
-          <SettingsModal
-            isOpen={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-            settings={settings}
-            onSave={handleSaveSettings}
-          />
-          <div className="app-content print:pt-0">
-            <CVPage cvData={cvData} updateField={updateField} />
+          <div className={`app-content print:pt-0 ${printPreview ? 'page-preview' : ''}`}>
+            <div className="page-preview-stage">
+              <CVPage cvData={cvData} updateField={updateField} />
+            </div>
           </div>
         </>
       )}
+      <JsonEditorModal
+        isOpen={jsonEditorOpen}
+        visible={!boardOpen && !routeLoading}
+        onClose={() => setJsonEditorOpen(false)}
+        cvData={cvData}
+        onConfirm={loadData}
+        showSnackbar={showSnackbar}
+      />
+      <SettingsModal
+        isOpen={settingsOpen}
+        visible={!boardOpen && !routeLoading}
+        onClose={handleCloseSettings}
+        settings={effectiveEditorSettings}
+        templateId={activeTemplateId}
+        onPreview={handlePreviewSettings}
+        onSave={handleSaveSettings}
+      />
       {snackbar && (
         <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg text-white text-sm font-medium shadow-lg z-3000 backdrop-blur-sm ${snackbar.type === 'error' ? 'bg-red-600/70' : 'bg-green-600/70'}`}
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg text-white text-sm font-medium shadow-lg z-3000 backdrop-blur-sm print:hidden ${snackbar.type === 'error' ? 'bg-red-600/70' : 'bg-green-600/70'}`}
         >
           {snackbar.message}
         </div>
