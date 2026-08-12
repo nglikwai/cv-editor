@@ -321,7 +321,7 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
 }
 
 export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecoverDraft, userId = 'default' }) => {
-  const initialPreferences = useMemo(() => loadDashboardPreferences(userId), [userId])
+  const [initialPreferences, setInitialPreferences] = useState({ boardTag: '', monthRange: 2 })
   const [saves, setSaves] = useState([])
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -337,6 +337,10 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
   const [newCVOpen, setNewCVOpen] = useState(false)
   const boardScrollRef = useRef(null)
   const initialScrollSet = useRef(false)
+
+  useEffect(() => {
+    setInitialPreferences(loadDashboardPreferences(userId))
+  }, [userId])
 
   useEffect(() => {
     setSelectedBoardTag(initialPreferences.boardTag)

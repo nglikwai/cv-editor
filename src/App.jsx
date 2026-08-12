@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { Toolbar } from './components/Toolbar'
@@ -63,6 +65,7 @@ const loadUnsavedDraft = (userId) => {
 }
 
 const readRoute = () => {
+  if (typeof window === 'undefined') return { view: 'board', name: null }
   const match = window.location.pathname.match(/^\/editor(?:\/([^/]+))?\/?$/)
   if (!match) return { view: 'board', name: null }
 
@@ -82,18 +85,15 @@ const editorPath = (name, version = null) => {
 }
 
 function App() {
-  const { users, activeUser, switchUser, addUser } = useWorkspaceUser()
+  const { users, activeUser, switchUser, addUser, hydrated: workspaceHydrated } = useWorkspaceUser()
   const { cvData, updateField, loadData } = useCVData(initialData)
   const [saving, setSaving] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [saveNameOpen, setSaveNameOpen] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
-  const [boardOpen, setBoardOpen] = useState(() => readRoute().view === 'board')
-  const [routeLoading, setRouteLoading] = useState(() => {
-    const route = readRoute()
-    return route.view === 'editor' && !!route.name
-  })
+  const [boardOpen, setBoardOpen] = useState(true)
+  const [routeLoading, setRouteLoading] = useState(false)
   const [currentSaveName, setCurrentSaveName] = useState(null)
   const [currentSaveTags, setCurrentSaveTags] = useState([])
   const [currentVersionId, setCurrentVersionId] = useState(null)
@@ -104,11 +104,11 @@ function App() {
   })
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [snackbar, setSnackbar] = useState(null)
-  const [darkMode, setDarkMode] = useState(() => loadDarkMode(activeUser.id))
-  const [autoSave, setAutoSave] = useState(() => loadAutoSave(activeUser.id))
+  const [darkMode, setDarkMode] = useState(false)
+  const [autoSave, setAutoSave] = useState(false)
   const [autoSaving, setAutoSaving] = useState(false)
   const [printPreview, setPrintPreview] = useState(true)
-  const [unsavedDraft, setUnsavedDraft] = useState(() => loadUnsavedDraft(activeUser.id))
+  const [unsavedDraft, setUnsavedDraft] = useState(null)
   const autoSaveBaselineRef = useRef({ name: null, snapshot: JSON.stringify(initialData) })
   const autoSaveQueueRef = useRef(Promise.resolve())
   const autoSaveTimerRef = useRef(null)
@@ -225,6 +225,15 @@ function App() {
   }
 
   useEffect(() => {
+    if (!workspaceHydrated) return
+    setDarkMode(loadDarkMode(activeUser.id))
+    setAutoSave(loadAutoSave(activeUser.id))
+    const draft = loadUnsavedDraft(activeUser.id)
+    setUnsavedDraft(draft)
+  }, [workspaceHydrated, activeUser.id])
+
+  useEffect(() => {
+    if (!workspaceHydrated) return undefined
     try {
       localStorage.setItem(workspaceStorageKey(COLOR_MODE_KEY, activeUser.id), darkMode ? 'dark' : 'light')
     } catch {
@@ -238,15 +247,16 @@ function App() {
       document.documentElement.classList.remove('dark-ui-body')
       document.body.classList.remove('dark-ui-body')
     }
-  }, [darkMode, activeUser.id])
+  }, [darkMode, activeUser.id, workspaceHydrated])
 
   useEffect(() => {
+    if (!workspaceHydrated) return
     try {
       localStorage.setItem(workspaceStorageKey(AUTO_SAVE_KEY, activeUser.id), String(autoSave))
     } catch {
       // Auto-save persistence is optional when storage is unavailable.
     }
-  }, [autoSave, activeUser.id])
+  }, [autoSave, activeUser.id, workspaceHydrated])
 
   useEffect(() => {
     if (!autoSave || !currentSaveName || currentVersionId || routeLoading || saving) return undefined
@@ -328,6 +338,7 @@ function App() {
   }, [effectiveThemeColors, effectiveTemplateLayout])
 
   useEffect(() => {
+    if (!workspaceHydrated) return undefined
     let routeRequest = 0
 
     const syncRoute = async () => {
@@ -404,7 +415,7 @@ function App() {
       routeRequest += 1
       window.removeEventListener('popstate', syncRoute)
     }
-  }, [activeUser.id, loadData])
+  }, [activeUser.id, loadData, workspaceHydrated])
 
   const navigateToBoard = () => {
     window.history.pushState(null, '', '/')

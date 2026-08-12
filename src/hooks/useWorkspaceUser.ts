@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const USERS_KEY = 'cv-workspace-users'
 const ACTIVE_USER_KEY = 'cv-active-user'
@@ -20,15 +20,27 @@ const readUsers = () => {
 }
 
 export const useWorkspaceUser = () => {
-  const [users, setUsers] = useState(readUsers)
-  const [activeUserId, setActiveUserId] = useState(() => {
-    try {
-      return localStorage.getItem(ACTIVE_USER_KEY) || DEFAULT_USERS[0].id
-    } catch {
-      return DEFAULT_USERS[0].id
-    }
-  })
+  // Keep the server render and the first browser render identical. Browser
+  // storage is loaded after hydration in the effect below.
+  const [users, setUsers] = useState(DEFAULT_USERS)
+  const [activeUserId, setActiveUserId] = useState(DEFAULT_USERS[0].id)
+  const [hydrated, setHydrated] = useState(false)
   const activeUser = users.find((user) => user.id === activeUserId) || users[0]
+
+  useEffect(() => {
+    const storedUsers = readUsers()
+    let storedActiveUserId = DEFAULT_USERS[0].id
+    try {
+      storedActiveUserId = localStorage.getItem(ACTIVE_USER_KEY) || storedActiveUserId
+    } catch {
+      // User preference persistence is optional when storage is unavailable.
+    }
+    setUsers(storedUsers)
+    setActiveUserId(storedUsers.some((user) => user.id === storedActiveUserId)
+      ? storedActiveUserId
+      : storedUsers[0].id)
+    setHydrated(true)
+  }, [])
 
   const switchUser = (userId) => {
     const nextUser = users.find((user) => user.id === userId)
@@ -59,7 +71,7 @@ export const useWorkspaceUser = () => {
     return user
   }
 
-  return { users, activeUser, switchUser, addUser }
+  return { users, activeUser, switchUser, addUser, hydrated }
 }
 
 export const workspaceStorageKey = (key, userId) => `${key}:${userId || 'default'}`

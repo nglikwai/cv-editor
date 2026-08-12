@@ -95,7 +95,7 @@ export const AppLayout = ({
         </button>
 
         {activeUser && (
-          <div className="relative h-9 flex items-center gap-1 px-2 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
+          <div className="relative h-9 flex items-center gap-1.5 px-2.5 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
             <FiUser size={15} />
             <button
               type="button"
@@ -106,9 +106,6 @@ export const AppLayout = ({
             >
               <span className="truncate">{activeUser.name}</span>
               <FiChevronDown size={13} className={`shrink-0 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
-            <button type="button" onClick={onAddUser} className="w-6 h-6 rounded-md flex items-center justify-center text-text-light hover:text-deep-blue hover:bg-white" aria-label="Add local workspace user" title="Add local workspace user">
-              <FiPlus size={14} />
             </button>
             {userMenuOpen && (
               <div className="absolute right-0 top-11 z-[1500] min-w-48 rounded-xl border border-border-light bg-white p-1.5 shadow-xl">
@@ -124,6 +121,16 @@ export const AppLayout = ({
                     {user.id === activeUser.id && <FiCheck size={14} className="shrink-0 text-deep-blue" />}
                   </button>
                 ))}
+                <div className="my-1 border-t border-border-light" />
+                <button
+                  type="button"
+                  onClick={() => { onAddUser(); setUserMenuOpen(false) }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-text-dark hover:bg-bg-light"
+                  aria-label="Add local workspace user"
+                >
+                  <FiPlus size={14} className="shrink-0 text-text-light" />
+                  Add user
+                </button>
               </div>
             )}
           </div>
