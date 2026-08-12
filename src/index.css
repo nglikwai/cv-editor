@@ -122,6 +122,11 @@ html.dark-ui-body #root {
   margin-top: var(--cv-section-spacing, 16px);
 }
 
+.cv-container .experience-item {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 .cv-container .cv-header {
   padding-top: var(--cv-header-padding-y, 40px);
   padding-bottom: var(--cv-header-padding-y, 40px);
@@ -546,6 +551,23 @@ html.dark-ui-body #root {
   page-break-inside: auto;
 }
 
+/* Section spacing is applied only between sections. Remove the legacy
+   per-section vertical padding and template-specific top offsets so the
+   configured value is predictable everywhere. */
+.cv-container .cv-section {
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+}
+
+.cv-container .cv-section + .cv-section {
+  margin-top: var(--cv-section-spacing, 16px);
+}
+
+.cv-container .cv-header + .cv-section {
+  margin-top: var(--cv-section-spacing, 16px);
+}
+
 .dark-ui {
   color-scheme: dark;
   --app-canvas: #181818;
@@ -660,7 +682,6 @@ html.dark-ui-body #root {
   }
 
   .cv-container .cv-experience,
-  .cv-container .experience-item,
   .cv-container .experience-content {
     break-inside: auto;
     page-break-inside: auto;
