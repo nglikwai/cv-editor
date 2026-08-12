@@ -11,12 +11,13 @@ import {
 } from 'react-icons/fi'
 import { deleteSave, listSaves, loadBoard, updateSaveStatus } from '../services/s3'
 import { NewCVModal } from './NewCVModal'
+import { workspaceStorageKey } from '../hooks/useWorkspaceUser'
 
 const DASHBOARD_PREFERENCES_KEY = 'cv-dashboard-preferences'
 
-const loadDashboardPreferences = () => {
+const loadDashboardPreferences = (userId = 'default') => {
   try {
-    const saved = JSON.parse(localStorage.getItem(DASHBOARD_PREFERENCES_KEY) || '{}')
+    const saved = JSON.parse(localStorage.getItem(workspaceStorageKey(DASHBOARD_PREFERENCES_KEY, userId)) || '{}')
     const validRanges = [2, 4, 6, 'all']
     return {
       boardTag: typeof saved.boardTag === 'string' ? saved.boardTag : '',
@@ -319,8 +320,8 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
   )
 }
 
-export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecoverDraft }) => {
-  const initialPreferences = useMemo(loadDashboardPreferences, [])
+export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecoverDraft, userId = 'default' }) => {
+  const initialPreferences = useMemo(() => loadDashboardPreferences(userId), [userId])
   const [saves, setSaves] = useState([])
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -337,12 +338,18 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
   const boardScrollRef = useRef(null)
   const initialScrollSet = useRef(false)
 
+  useEffect(() => {
+    setSelectedBoardTag(initialPreferences.boardTag)
+    setMonthRange(initialPreferences.monthRange)
+    initialScrollSet.current = false
+  }, [initialPreferences])
+
   const fetchBoard = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true)
       else setLoading(true)
       setError(null)
-      const [savesList, board] = await Promise.all([listSaves(), loadBoard()])
+      const [savesList, board] = await Promise.all([listSaves(userId), loadBoard(userId)])
       setSaves(savesList)
       setColumns(board.columns)
     } catch (err) {
@@ -352,7 +359,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     fetchBoard()
@@ -360,14 +367,14 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
 
   useEffect(() => {
     try {
-      localStorage.setItem(DASHBOARD_PREFERENCES_KEY, JSON.stringify({
+      localStorage.setItem(workspaceStorageKey(DASHBOARD_PREFERENCES_KEY, userId), JSON.stringify({
         boardTag: selectedBoardTag,
         monthRange,
       }))
     } catch {
       // Local preferences are optional when storage is unavailable.
     }
-  }, [selectedBoardTag, monthRange])
+  }, [selectedBoardTag, monthRange, userId])
 
   useLayoutEffect(() => {
     if (loading || !columns.length || initialScrollSet.current) return
@@ -472,7 +479,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
     )
 
     try {
-      await updateSaveStatus(name, columnId)
+      await updateSaveStatus(name, columnId, userId)
     } catch (err) {
       console.error('Error updating status:', err)
       // Revert
@@ -500,7 +507,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
     }
     setConfirmDelete(null)
     try {
-      await deleteSave(name)
+      await deleteSave(name, userId)
       setSaves((prev) => prev.filter((s) => s.name !== name))
     } catch (err) {
       console.error('Error deleting save:', err)

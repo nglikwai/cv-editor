@@ -16,6 +16,7 @@ import {
   normalizeSettings,
 } from './components/SettingsModal'
 import { useCVData } from './hooks/useCVData'
+import { useWorkspaceUser, workspaceStorageKey } from './hooks/useWorkspaceUser'
 import {
   loadFromS3,
   loadVersionFromS3,
@@ -30,25 +31,31 @@ const COLOR_MODE_KEY = 'cv-color-mode'
 const AUTO_SAVE_KEY = 'cv-auto-save'
 const UNSAVED_DRAFT_KEY = 'cv-unsaved-draft'
 
-const loadDarkMode = () => {
+const loadDarkMode = (userId) => {
   try {
-    return localStorage.getItem(COLOR_MODE_KEY) === 'dark'
+    const value = localStorage.getItem(workspaceStorageKey(COLOR_MODE_KEY, userId))
+      ?? (userId === 'default' ? localStorage.getItem(COLOR_MODE_KEY) : null)
+    return value === 'dark'
   } catch {
     return false
   }
 }
 
-const loadAutoSave = () => {
+const loadAutoSave = (userId) => {
   try {
-    return localStorage.getItem(AUTO_SAVE_KEY) === 'true'
+    const value = localStorage.getItem(workspaceStorageKey(AUTO_SAVE_KEY, userId))
+      ?? (userId === 'default' ? localStorage.getItem(AUTO_SAVE_KEY) : null)
+    return value === 'true'
   } catch {
     return false
   }
 }
 
-const loadUnsavedDraft = () => {
+const loadUnsavedDraft = (userId) => {
   try {
-    const draft = JSON.parse(localStorage.getItem(UNSAVED_DRAFT_KEY) || 'null')
+    const stored = localStorage.getItem(workspaceStorageKey(UNSAVED_DRAFT_KEY, userId))
+      ?? (userId === 'default' ? localStorage.getItem(UNSAVED_DRAFT_KEY) : null)
+    const draft = JSON.parse(stored || 'null')
     return draft?.data && typeof draft.data === 'object' ? draft : null
   } catch {
     return null
@@ -75,6 +82,7 @@ const editorPath = (name, version = null) => {
 }
 
 function App() {
+  const { users, activeUser, switchUser, addUser } = useWorkspaceUser()
   const { cvData, updateField, loadData } = useCVData(initialData)
   const [saving, setSaving] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
@@ -96,15 +104,15 @@ function App() {
   })
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [snackbar, setSnackbar] = useState(null)
-  const [darkMode, setDarkMode] = useState(loadDarkMode)
-  const [autoSave, setAutoSave] = useState(loadAutoSave)
+  const [darkMode, setDarkMode] = useState(() => loadDarkMode(activeUser.id))
+  const [autoSave, setAutoSave] = useState(() => loadAutoSave(activeUser.id))
   const [autoSaving, setAutoSaving] = useState(false)
   const [printPreview, setPrintPreview] = useState(true)
-  const [unsavedDraft, setUnsavedDraft] = useState(loadUnsavedDraft)
+  const [unsavedDraft, setUnsavedDraft] = useState(() => loadUnsavedDraft(activeUser.id))
   const autoSaveBaselineRef = useRef({ name: null, snapshot: JSON.stringify(initialData) })
   const autoSaveQueueRef = useRef(Promise.resolve())
   const autoSaveTimerRef = useRef(null)
-  const previewCenteredRef = useRef(false)
+  const previewPositionedRef = useRef(false)
   const requestedTemplateId = cvData.presentation?.templateId || 'modern'
   const normalizedTemplateId = requestedTemplateId === 'simple' ? 'classic' : requestedTemplateId
   const activeTemplateId = CV_TEMPLATES.some((template) => template.id === normalizedTemplateId)
@@ -185,11 +193,14 @@ function App() {
       cvElement.style.setProperty('--preview-pages-width', `${previewWidth}px`)
       previewStage.style.setProperty('--preview-stage-width', `${stageWidth}px`)
       previewStage.style.setProperty('--preview-stage-height', `${pageHeight}px`)
-      previewStage.style.setProperty('--preview-side-gutter', `${viewportWidth / 2}px`)
+      // Keep the first page 30% from the editor viewport's left edge on
+      // initial load. The viewport remains freely horizontally scrollable.
+      const previewLeftGutter = viewportWidth * 0.3
+      previewStage.style.setProperty('--preview-side-gutter', `${previewLeftGutter}px`)
 
-      if (!previewCenteredRef.current) {
-        previewStage.parentElement.scrollLeft = previewWidth / 2
-        previewCenteredRef.current = true
+      if (!previewPositionedRef.current) {
+        previewStage.parentElement.scrollLeft = 0
+        previewPositionedRef.current = true
       }
     }
 
@@ -205,7 +216,7 @@ function App() {
   }, [printPreview, boardOpen, routeLoading, cvData, effectiveEditorSettings])
 
   useEffect(() => {
-    if (!printPreview) previewCenteredRef.current = false
+    if (!printPreview) previewPositionedRef.current = false
   }, [printPreview])
 
   const showSnackbar = (message, type = 'success') => {
@@ -215,7 +226,7 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(COLOR_MODE_KEY, darkMode ? 'dark' : 'light')
+      localStorage.setItem(workspaceStorageKey(COLOR_MODE_KEY, activeUser.id), darkMode ? 'dark' : 'light')
     } catch {
       // Theme persistence is optional when storage is unavailable.
     }
@@ -227,15 +238,15 @@ function App() {
       document.documentElement.classList.remove('dark-ui-body')
       document.body.classList.remove('dark-ui-body')
     }
-  }, [darkMode])
+  }, [darkMode, activeUser.id])
 
   useEffect(() => {
     try {
-      localStorage.setItem(AUTO_SAVE_KEY, String(autoSave))
+      localStorage.setItem(workspaceStorageKey(AUTO_SAVE_KEY, activeUser.id), String(autoSave))
     } catch {
       // Auto-save persistence is optional when storage is unavailable.
     }
-  }, [autoSave])
+  }, [autoSave, activeUser.id])
 
   useEffect(() => {
     if (!autoSave || !currentSaveName || currentVersionId || routeLoading || saving) return undefined
@@ -253,7 +264,7 @@ function App() {
       const persist = async () => {
         setAutoSaving(true)
         try {
-          await saveToS3(saveData, saveName, saveTags, false)
+          await saveToS3(saveData, saveName, saveTags, false, activeUser.id)
           autoSaveBaselineRef.current = { name: saveName, snapshot }
         } catch (err) {
           console.error('Error auto-saving to S3:', err)
@@ -282,7 +293,7 @@ function App() {
         savedAt: new Date().toISOString(),
       }
       try {
-        localStorage.setItem(UNSAVED_DRAFT_KEY, JSON.stringify(draft))
+        localStorage.setItem(workspaceStorageKey(UNSAVED_DRAFT_KEY, activeUser.id), JSON.stringify(draft))
         setUnsavedDraft(draft)
       } catch (err) {
         console.error('Error saving local draft:', err)
@@ -290,7 +301,7 @@ function App() {
     }, 800)
 
     return () => clearTimeout(timeout)
-  }, [boardOpen, currentSaveName, currentSaveTags, cvData, routeLoading])
+  }, [activeUser.id, boardOpen, currentSaveName, currentSaveTags, cvData, routeLoading])
 
   useEffect(() => {
     const loadInitialSettings = async () => {
@@ -331,7 +342,7 @@ function App() {
 
       setBoardOpen(false)
       if (!route.name) {
-        const draft = loadUnsavedDraft()
+        const draft = loadUnsavedDraft(activeUser.id)
         const draftData = draft?.data || initialData
         loadData(draftData)
         autoSaveBaselineRef.current = { name: null, snapshot: JSON.stringify(draftData) }
@@ -347,16 +358,16 @@ function App() {
       try {
         const [requestedData, saves] = await Promise.all([
           route.version
-            ? loadVersionFromS3(route.name, route.version)
-            : loadFromS3(route.name),
-          listSaves(),
+            ? loadVersionFromS3(route.name, route.version, activeUser.id)
+            : loadFromS3(route.name, activeUser.id),
+          listSaves(activeUser.id),
         ])
         if (request !== routeRequest) return
 
         let data = requestedData
         let loadedVersionId = route.version || null
         if (!data && route.version) {
-          data = await loadFromS3(route.name)
+          data = await loadFromS3(route.name, activeUser.id)
           if (request !== routeRequest) return
           if (data) {
             loadedVersionId = null
@@ -393,7 +404,7 @@ function App() {
       routeRequest += 1
       window.removeEventListener('popstate', syncRoute)
     }
-  }, [loadData])
+  }, [activeUser.id, loadData])
 
   const navigateToBoard = () => {
     window.history.pushState(null, '', '/')
@@ -405,9 +416,30 @@ function App() {
     setBoardOpen(false)
   }
 
+  const handleUserChange = (userId) => {
+    if (userId === activeUser.id) return
+    switchUser(userId)
+    setDarkMode(loadDarkMode(userId))
+    setAutoSave(loadAutoSave(userId))
+    const draft = loadUnsavedDraft(userId)
+    loadData(draft?.data || initialData)
+    setUnsavedDraft(draft)
+    setCurrentSaveName(null)
+    setCurrentSaveTags(draft?.tags || [])
+    setCurrentVersionId(null)
+    navigateToBoard()
+  }
+
+  const handleAddUser = () => {
+    const name = window.prompt('Name this local workspace user')
+    if (!name?.trim()) return
+    const user = addUser(name)
+    handleUserChange(user.id)
+  }
+
   const handleNewCV = async (boardTag = '', sourceSave = null) => {
     try {
-      const sourceData = sourceSave ? await loadFromS3(sourceSave.name) : initialData
+      const sourceData = sourceSave ? await loadFromS3(sourceSave.name, activeUser.id) : initialData
       if (!sourceData) {
         showSnackbar('The CV selected for cloning could not be found', 'error')
         return false
@@ -428,7 +460,7 @@ function App() {
   }
 
   const handleRecoverDraft = () => {
-    const draft = unsavedDraft || loadUnsavedDraft()
+    const draft = unsavedDraft || loadUnsavedDraft(activeUser.id)
     if (!draft?.data) {
       showSnackbar('No recoverable draft was found', 'error')
       return
@@ -445,7 +477,7 @@ function App() {
 
   const handleSave = async () => {
     try {
-      const saves = await listSaves()
+      const saves = await listSaves(activeUser.id)
       const allTags = [...new Set(saves.flatMap((s) => s.tags || []))].sort()
       const existing = saves.find((s) => s.name === currentSaveName)
       setSaveModalData({
@@ -465,11 +497,11 @@ function App() {
     const isSavingUnsavedDraft = !currentSaveName
     try {
       setSaving(true)
-      await saveToS3(cvData, name, tags, mode !== 'replace')
+      await saveToS3(cvData, name, tags, mode !== 'replace', activeUser.id)
       autoSaveBaselineRef.current = { name, snapshot: JSON.stringify(cvData) }
       if (isSavingUnsavedDraft) {
         try {
-          localStorage.removeItem(UNSAVED_DRAFT_KEY)
+          localStorage.removeItem(workspaceStorageKey(UNSAVED_DRAFT_KEY, activeUser.id))
         } catch {
           // Local draft cleanup is optional when storage is unavailable.
         }
@@ -496,7 +528,7 @@ function App() {
 
   const handleOpenCV = async (name, tags) => {
     try {
-      const data = await loadFromS3(name)
+      const data = await loadFromS3(name, activeUser.id)
       if (data) {
         loadData(data)
         autoSaveBaselineRef.current = { name, snapshot: JSON.stringify(data) }
@@ -517,8 +549,8 @@ function App() {
 
     try {
       const data = versionId
-        ? await loadVersionFromS3(currentSaveName, versionId)
-        : await loadFromS3(currentSaveName)
+        ? await loadVersionFromS3(currentSaveName, versionId, activeUser.id)
+        : await loadFromS3(currentSaveName, activeUser.id)
       if (!data) {
         showSnackbar('That version could not be found', 'error')
         return
@@ -579,7 +611,7 @@ function App() {
       await autoSaveQueueRef.current.catch(() => undefined)
 
       if (currentSaveName && !currentVersionId) {
-        await saveToS3(updatedCvData, currentSaveName, currentSaveTags, false)
+        await saveToS3(updatedCvData, currentSaveName, currentSaveTags, false, activeUser.id)
       }
       await saveSettings(globalSettings)
 
@@ -661,6 +693,10 @@ function App() {
       templateId={activeTemplateId}
       templates={CV_TEMPLATES}
       onTemplateChange={handleTemplateChange}
+      users={users}
+      activeUser={activeUser}
+      onUserChange={handleUserChange}
+      onAddUser={handleAddUser}
     >
       {boardOpen ? (
         <BoardDashboard
@@ -668,6 +704,7 @@ function App() {
           onLoad={handleOpenCV}
           recoverableDraft={unsavedDraft}
           onRecoverDraft={handleRecoverDraft}
+          userId={activeUser.id}
         />
       ) : routeLoading ? (
         <div className="h-full flex items-center justify-center bg-bg-light text-sm text-text-light">
@@ -708,6 +745,7 @@ function App() {
             cvName={currentSaveName}
             currentVersionId={currentVersionId}
             onLoadVersion={handleSelectVersion}
+            userId={activeUser.id}
           />
           <div className={`app-content print:pt-0 ${printPreview ? 'page-preview' : ''}`}>
             <div className="page-preview-stage">

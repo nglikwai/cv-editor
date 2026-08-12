@@ -16,10 +16,12 @@ const s3Client = new S3Client({
 })
 
 const BUCKET = import.meta.env.VITE_S3_BUCKET || 'likwai'
-const FOLDER = 'willcv'
-const SETTINGS_KEY = 'willcv/settings.json'
-const TAGS_KEY = 'willcv/tags.json'
-const BOARD_KEY = 'willcv/board.json'
+const FOLDER = 'cv-workspace'
+const LEGACY_FOLDER = 'willcv'
+const SETTINGS_KEY = `${FOLDER}/settings.json`
+const LEGACY_SETTINGS_KEY = `${LEGACY_FOLDER}/settings.json`
+const TAGS_KEY = `${FOLDER}/will/tags.json`
+const BOARD_KEY = `${FOLDER}/will/board.json`
 const VERSIONS_FOLDER = `${FOLDER}/versions`
 const NO_CACHE = 'no-store, no-cache, must-revalidate, max-age=0'
 
@@ -39,26 +41,41 @@ const DEFAULT_BOARD = {
   statuses: {},
 }
 
-const cvKey = (name) => `${FOLDER}/${name}.json`
-const versionPrefix = (name) => `${VERSIONS_FOLDER}/${encodeURIComponent(name)}/`
-const versionKey = (name, versionId) => `${versionPrefix(name)}${encodeURIComponent(versionId)}.json`
+const userFolder = (userId = 'default') => userId === 'default'
+  ? `${FOLDER}/will`
+  : `${FOLDER}/${encodeURIComponent(userId)}`
+const legacyCvKey = (name) => `${LEGACY_FOLDER}/${name}.json`
+const legacyVersionPrefix = (name) => `${LEGACY_FOLDER}/versions/${encodeURIComponent(name)}/`
+const legacyVersionKey = (name, versionId) => `${legacyVersionPrefix(name)}${encodeURIComponent(versionId)}.json`
+const legacyTagsKey = `${LEGACY_FOLDER}/tags.json`
+const legacyBoardKey = `${LEGACY_FOLDER}/board.json`
+const userTagsKey = (userId = 'default') => userId === 'default' ? TAGS_KEY : `${userFolder(userId)}/tags.json`
+const userBoardKey = (userId = 'default') => userId === 'default' ? BOARD_KEY : `${userFolder(userId)}/board.json`
+const cvKey = (name, userId = 'default') => `${userFolder(userId)}/${name}.json`
+const versionPrefix = (name, userId = 'default') => `${userFolder(userId)}/versions/${encodeURIComponent(name)}/`
+const versionKey = (name, versionId, userId = 'default') => `${versionPrefix(name, userId)}${encodeURIComponent(versionId)}.json`
 
-const loadTags = async () => {
+const loadTags = async (userId = 'default') => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: TAGS_KEY, ResponseCacheControl: NO_CACHE })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: userTagsKey(userId), ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     return JSON.parse(text)
   } catch (error) {
+    if (error.name === 'NoSuchKey' && userId === 'default') {
+      const legacy = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET, Key: legacyTagsKey, ResponseCacheControl: NO_CACHE })).catch(() => null)
+      if (legacy) return JSON.parse(await legacy.Body.transformToString())
+      return {}
+    }
     if (error.name === 'NoSuchKey') return {}
     throw error
   }
 }
 
-const saveTags = async (tags) => {
+const saveTags = async (tags, userId = 'default') => {
   const command = new PutObjectCommand({
     Bucket: BUCKET,
-    Key: TAGS_KEY,
+    Key: userTagsKey(userId),
     Body: JSON.stringify(tags, null, 2),
     ContentType: 'application/json',
     CacheControl: NO_CACHE,
@@ -68,21 +85,28 @@ const saveTags = async (tags) => {
 
 const META_KEYS = new Set([SETTINGS_KEY, TAGS_KEY, BOARD_KEY, `${FOLDER}/`])
 
-export const listSaves = async () => {
-  const command = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: `${FOLDER}/` })
-  const [response, tags, board] = await Promise.all([
+export const listSaves = async (userId = 'default') => {
+  const prefix = `${userFolder(userId)}/`
+  const command = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix })
+  const [response, legacyResponse, tags, board] = await Promise.all([
     s3Client.send(command),
-    loadTags().catch(() => ({})),
-    loadBoard().catch(() => ({ ...DEFAULT_BOARD, statuses: {} })),
+    userId === 'default'
+      ? s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: `${LEGACY_FOLDER}/` })).catch(() => ({ Contents: [] }))
+      : Promise.resolve({ Contents: [] }),
+    loadTags(userId).catch(() => ({})),
+    loadBoard(userId).catch(() => ({ ...DEFAULT_BOARD, statuses: {} })),
   ])
-  return (response.Contents || [])
+  const objects = [...(response.Contents || []), ...(legacyResponse.Contents || [])]
+  return objects
     .filter((obj) => {
-      if (META_KEYS.has(obj.Key) || !obj.Key.endsWith('.json')) return false
-      const relativeKey = obj.Key.slice(`${FOLDER}/`.length)
+      if (obj.Key === userTagsKey(userId) || obj.Key === userBoardKey(userId) || !obj.Key.endsWith('.json')) return false
+      const sourcePrefix = obj.Key.startsWith(prefix) ? prefix : `${LEGACY_FOLDER}/`
+      const relativeKey = obj.Key.slice(sourcePrefix.length)
       return !relativeKey.includes('/')
     })
     .map((obj) => {
-      const name = obj.Key.slice(`${FOLDER}/`.length).replace(/\.json$/, '')
+      const sourcePrefix = obj.Key.startsWith(prefix) ? prefix : `${LEGACY_FOLDER}/`
+      const name = obj.Key.slice(sourcePrefix.length).replace(/\.json$/, '')
       return {
         key: obj.Key,
         name,
@@ -95,24 +119,34 @@ export const listSaves = async () => {
     .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified))
 }
 
-export const loadFromS3 = async (name) => {
+export const loadFromS3 = async (name, userId = 'default') => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: cvKey(name), ResponseCacheControl: NO_CACHE })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: cvKey(name, userId), ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     return JSON.parse(text)
   } catch (error) {
+    if (error.name === 'NoSuchKey' && userId === 'default') {
+      const legacy = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET, Key: legacyCvKey(name), ResponseCacheControl: NO_CACHE })).catch(() => null)
+      if (legacy) return JSON.parse(await legacy.Body.transformToString())
+      return null
+    }
     if (error.name === 'NoSuchKey') return null
     throw error
   }
 }
 
-export const listVersions = async (name) => {
-  const prefix = versionPrefix(name)
+export const listVersions = async (name, userId = 'default') => {
+  const prefix = versionPrefix(name, userId)
   const command = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix })
-  const response = await s3Client.send(command)
+  const [response, legacyResponse] = await Promise.all([
+    s3Client.send(command),
+    userId === 'default'
+      ? s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: legacyVersionPrefix(name) })).catch(() => ({ Contents: [] }))
+      : Promise.resolve({ Contents: [] }),
+  ])
 
-  return (response.Contents || [])
+  return [...(response.Contents || []), ...(legacyResponse.Contents || [])]
     .filter((object) => object.Key.endsWith('.json'))
     .map((object) => {
       const encodedId = object.Key.slice(prefix.length).replace(/\.json$/, '')
@@ -125,43 +159,47 @@ export const listVersions = async (name) => {
     .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified))
 }
 
-export const loadVersionFromS3 = async (name, versionId) => {
+export const loadVersionFromS3 = async (name, versionId, userId = 'default') => {
   try {
     const command = new GetObjectCommand({
       Bucket: BUCKET,
-      Key: versionKey(name, versionId),
+      Key: versionKey(name, versionId, userId),
       ResponseCacheControl: NO_CACHE,
     })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     return JSON.parse(text)
   } catch (error) {
+    if (error.name === 'NoSuchKey' && userId === 'default') {
+      const legacy = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET, Key: legacyVersionKey(name, versionId), ResponseCacheControl: NO_CACHE })).catch(() => null)
+      return legacy ? JSON.parse(await legacy.Body.transformToString()) : null
+    }
     if (error.name === 'NoSuchKey') return null
     throw error
   }
 }
 
-export const deleteVersion = async (name, versionId) => {
+export const deleteVersion = async (name, versionId, userId = 'default') => {
   const command = new DeleteObjectCommand({
     Bucket: BUCKET,
-    Key: versionKey(name, versionId),
+    Key: versionKey(name, versionId, userId),
   })
   await s3Client.send(command)
 }
 
-export const loadLatestFromS3 = async () => {
-  const saves = await listSaves()
+export const loadLatestFromS3 = async (userId = 'default') => {
+  const saves = await listSaves(userId)
   if (!saves.length) return { data: null, name: null, tags: [] }
-  const data = await loadFromS3(saves[0].name)
+  const data = await loadFromS3(saves[0].name, userId)
   return { data, name: saves[0].name, tags: saves[0].tags }
 }
 
-export const deleteSave = async (name) => {
-  const command = new DeleteObjectCommand({ Bucket: BUCKET, Key: cvKey(name) })
+export const deleteSave = async (name, userId = 'default') => {
+  const command = new DeleteObjectCommand({ Bucket: BUCKET, Key: cvKey(name, userId) })
   await s3Client.send(command)
   const versionsCommand = new ListObjectsV2Command({
     Bucket: BUCKET,
-    Prefix: versionPrefix(name),
+    Prefix: versionPrefix(name, userId),
   })
   const versions = await s3Client.send(versionsCommand)
   if (versions.Contents?.length) {
@@ -173,27 +211,27 @@ export const deleteSave = async (name) => {
       },
     }))
   }
-  const [tags, board] = await Promise.all([loadTags(), loadBoard()])
+  const [tags, board] = await Promise.all([loadTags(userId), loadBoard(userId)])
   const jobs = []
   if (name in tags) {
     delete tags[name]
-    jobs.push(saveTags(tags))
+    jobs.push(saveTags(tags, userId))
   }
   if (name in board.statuses) {
     delete board.statuses[name]
-    jobs.push(saveBoard(board))
+    jobs.push(saveBoard(board, userId))
   }
   await Promise.all(jobs)
 }
 
-export const saveToS3 = async (data, name, tags = [], createVersion = true) => {
+export const saveToS3 = async (data, name, tags = [], createVersion = true, userId = 'default') => {
   const body = JSON.stringify(data, null, 2)
 
   if (createVersion) {
     const versionId = new Date().toISOString()
     const versionCommand = new PutObjectCommand({
       Bucket: BUCKET,
-      Key: versionKey(name, versionId),
+      Key: versionKey(name, versionId, userId),
       Body: body,
       ContentType: 'application/json',
       CacheControl: NO_CACHE,
@@ -203,20 +241,20 @@ export const saveToS3 = async (data, name, tags = [], createVersion = true) => {
 
   const command = new PutObjectCommand({
     Bucket: BUCKET,
-    Key: cvKey(name),
+    Key: cvKey(name, userId),
     Body: body,
     ContentType: 'application/json',
     CacheControl: NO_CACHE,
   })
   await s3Client.send(command)
 
-  const allTags = await loadTags()
+  const allTags = await loadTags(userId)
   if (tags.length) {
     allTags[name] = tags
   } else {
     delete allTags[name]
   }
-  await saveTags(allTags)
+  await saveTags(allTags, userId)
 }
 
 export const loadSettings = async () => {
@@ -226,7 +264,10 @@ export const loadSettings = async () => {
     const text = await response.Body.transformToString()
     return JSON.parse(text)
   } catch (error) {
-    if (error.name === 'NoSuchKey') return null
+    if (error.name === 'NoSuchKey') {
+      const legacy = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET, Key: LEGACY_SETTINGS_KEY, ResponseCacheControl: NO_CACHE })).catch(() => null)
+      return legacy ? JSON.parse(await legacy.Body.transformToString()) : null
+    }
     throw error
   }
 }
@@ -242,9 +283,9 @@ export const saveSettings = async (data) => {
   await s3Client.send(command)
 }
 
-export const loadBoard = async () => {
+export const loadBoard = async (userId = 'default') => {
   try {
-    const command = new GetObjectCommand({ Bucket: BUCKET, Key: BOARD_KEY, ResponseCacheControl: NO_CACHE })
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: userBoardKey(userId), ResponseCacheControl: NO_CACHE })
     const response = await s3Client.send(command)
     const text = await response.Body.transformToString()
     const data = JSON.parse(text)
@@ -266,15 +307,22 @@ export const loadBoard = async () => {
       statuses,
     }
   } catch (error) {
+    if (error.name === 'NoSuchKey' && userId === 'default') {
+      const legacy = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET, Key: legacyBoardKey, ResponseCacheControl: NO_CACHE })).catch(() => null)
+      if (legacy) {
+        const data = JSON.parse(await legacy.Body.transformToString())
+        return { ...data, statuses: data.statuses || {} }
+      }
+    }
     if (error.name === 'NoSuchKey') return { ...DEFAULT_BOARD, statuses: {} }
     throw error
   }
 }
 
-export const saveBoard = async (board) => {
+export const saveBoard = async (board, userId = 'default') => {
   const command = new PutObjectCommand({
     Bucket: BUCKET,
-    Key: BOARD_KEY,
+    Key: userBoardKey(userId),
     Body: JSON.stringify(board, null, 2),
     ContentType: 'application/json',
     CacheControl: NO_CACHE,
@@ -282,9 +330,9 @@ export const saveBoard = async (board) => {
   await s3Client.send(command)
 }
 
-export const updateSaveStatus = async (name, status) => {
-  const board = await loadBoard()
+export const updateSaveStatus = async (name, status, userId = 'default') => {
+  const board = await loadBoard(userId)
   board.statuses[name] = status
-  await saveBoard(board)
+  await saveBoard(board, userId)
   return board
 }

@@ -1,4 +1,5 @@
-import { FiColumns, FiEdit3, FiFileText, FiLayout, FiMoon, FiSun } from 'react-icons/fi'
+import { useState } from 'react'
+import { FiCheck, FiChevronDown, FiColumns, FiEdit3, FiFileText, FiLayout, FiMoon, FiPlus, FiSun, FiUser } from 'react-icons/fi'
 
 const NavButton = ({ active, icon, label, onClick }) => (
   <button
@@ -26,8 +27,15 @@ export const AppLayout = ({
   templateId,
   templates = [],
   onTemplateChange,
+  users = [],
+  activeUser,
+  onUserChange,
+  onAddUser,
   children,
-}) => (
+}) => {
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  return (
   <div className={`app-shell ${darkMode ? 'dark-ui' : ''} min-h-screen h-screen flex flex-col bg-[var(--app-canvas)] text-text-dark print:h-auto print:min-h-0 print:block print:bg-white`}>
     <header className="h-16 shrink-0 bg-white border-b border-border-light shadow-sm z-[1200] print:hidden">
       <div className="h-full px-3 sm:px-5 flex items-center gap-3 sm:gap-6">
@@ -86,6 +94,41 @@ export const AppLayout = ({
           {darkMode ? <FiSun size={17} /> : <FiMoon size={17} />}
         </button>
 
+        {activeUser && (
+          <div className="relative h-9 flex items-center gap-1 px-2 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
+            <FiUser size={15} />
+            <button
+              type="button"
+              onClick={() => setUserMenuOpen((open) => !open)}
+              className="flex items-center gap-1 text-xs font-semibold text-text-dark focus:outline-none max-w-32"
+              aria-label="Workspace user"
+              aria-expanded={userMenuOpen}
+            >
+              <span className="truncate">{activeUser.name}</span>
+              <FiChevronDown size={13} className={`shrink-0 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <button type="button" onClick={onAddUser} className="w-6 h-6 rounded-md flex items-center justify-center text-text-light hover:text-deep-blue hover:bg-white" aria-label="Add local workspace user" title="Add local workspace user">
+              <FiPlus size={14} />
+            </button>
+            {userMenuOpen && (
+              <div className="absolute right-0 top-11 z-[1500] min-w-48 rounded-xl border border-border-light bg-white p-1.5 shadow-xl">
+                <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-light">Workspace user</p>
+                {users.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => { onUserChange?.(user.id); setUserMenuOpen(false) }}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-text-dark hover:bg-bg-light"
+                  >
+                    <span className="truncate">{user.name}</span>
+                    {user.id === activeUser.id && <FiCheck size={14} className="shrink-0 text-deep-blue" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="min-w-0 text-right hidden sm:block">
           <p className="text-[10px] uppercase tracking-wider font-semibold text-text-light">
             Current CV
@@ -102,4 +145,5 @@ export const AppLayout = ({
       {children}
     </main>
   </div>
-)
+  )
+}

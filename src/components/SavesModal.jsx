@@ -17,6 +17,7 @@ export const SavesModal = ({
   cvName,
   currentVersionId,
   onLoadVersion,
+  userId = 'default',
 }) => {
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -29,14 +30,14 @@ export const SavesModal = ({
     setLoading(true)
     setError(null)
     setConfirmDelete(null)
-    listVersions(cvName)
+    listVersions(cvName, userId)
       .then(setVersions)
       .catch((err) => {
         console.error('Error listing versions:', err)
         setError('Failed to load versions')
       })
       .finally(() => setLoading(false))
-  }, [isOpen, cvName])
+  }, [isOpen, cvName, userId])
 
   const handleLoad = async (versionId) => {
     setLoadingId(versionId || 'latest')
@@ -57,7 +58,7 @@ export const SavesModal = ({
     setConfirmDelete(null)
     setLoadingId(versionId)
     try {
-      await deleteVersion(cvName, versionId)
+      await deleteVersion(cvName, versionId, userId)
       setVersions((current) => current.filter((version) => version.id !== versionId))
       if (currentVersionId === versionId) await onLoadVersion(null)
     } catch (err) {
