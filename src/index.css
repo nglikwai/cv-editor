@@ -115,6 +115,13 @@ html.dark-ui-body #root {
   padding-bottom: var(--cv-section-spacing, 16px);
 }
 
+/* Keep the section control meaningful at the boundaries between every
+   adjacent CV section, including Experience → Skills → Certifications →
+   Education → Languages. */
+.cv-container .cv-section + .cv-section {
+  margin-top: var(--cv-section-spacing, 16px);
+}
+
 .cv-container .cv-header {
   padding-top: var(--cv-header-padding-y, 40px);
   padding-bottom: var(--cv-header-padding-y, 40px);
