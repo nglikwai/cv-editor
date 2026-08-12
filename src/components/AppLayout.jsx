@@ -1,4 +1,4 @@
-import { FiColumns, FiEdit3, FiFileText } from 'react-icons/fi'
+import { FiColumns, FiEdit3, FiFileText, FiMoon, FiSun } from 'react-icons/fi'
 
 const NavButton = ({ active, icon, label, onClick }) => (
   <button
@@ -21,9 +21,11 @@ export const AppLayout = ({
   currentSaveName,
   onNavigateBoard,
   onNavigateEditor,
+  darkMode,
+  onToggleDarkMode,
   children,
 }) => (
-  <div className="min-h-screen h-screen flex flex-col bg-[#f1f5f9] text-text-dark print:h-auto print:min-h-0 print:block print:bg-white">
+  <div className={`app-shell ${darkMode ? 'dark-ui' : ''} min-h-screen h-screen flex flex-col bg-[var(--app-canvas)] text-text-dark print:h-auto print:min-h-0 print:block print:bg-white`}>
     <header className="h-16 shrink-0 bg-white border-b border-border-light shadow-sm z-[1200] print:hidden">
       <div className="h-full px-3 sm:px-5 flex items-center gap-3 sm:gap-6">
         <div className="flex items-center gap-2.5 shrink-0">
@@ -53,6 +55,17 @@ export const AppLayout = ({
 
         <div className="flex-1" />
 
+        <button
+          type="button"
+          onClick={onToggleDarkMode}
+          className="w-9 h-9 rounded-lg border border-border-light bg-bg-light text-text-light hover:text-deep-blue hover:border-deep-blue/30 flex items-center justify-center transition-colors shrink-0"
+          aria-label={darkMode ? 'Use light mode' : 'Use dark mode'}
+          aria-pressed={darkMode}
+          title={darkMode ? 'Use light mode' : 'Use dark mode'}
+        >
+          {darkMode ? <FiSun size={17} /> : <FiMoon size={17} />}
+        </button>
+
         <div className="min-w-0 text-right hidden sm:block">
           <p className="text-[10px] uppercase tracking-wider font-semibold text-text-light">
             Current CV
@@ -61,6 +74,7 @@ export const AppLayout = ({
             {currentSaveName || 'Unsaved CV'}
           </p>
         </div>
+
       </div>
     </header>
 

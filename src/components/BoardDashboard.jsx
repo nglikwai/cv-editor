@@ -1,14 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   FiBriefcase,
   FiCheck,
   FiChevronDown,
+  FiClock,
   FiPlus,
   FiRefreshCw,
   FiTag,
   FiTrash2,
 } from 'react-icons/fi'
 import { deleteSave, listSaves, loadBoard, updateSaveStatus } from '../services/s3'
+import { NewCVModal } from './NewCVModal'
+
+const DASHBOARD_PREFERENCES_KEY = 'cv-dashboard-preferences'
+
+const loadDashboardPreferences = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DASHBOARD_PREFERENCES_KEY) || '{}')
+    const validRanges = [2, 4, 6, 'all']
+    return {
+      boardTag: typeof saved.boardTag === 'string' ? saved.boardTag : '',
+      monthRange: validRanges.includes(saved.monthRange) ? saved.monthRange : 2,
+    }
+  } catch {
+    return { boardTag: '', monthRange: 2 }
+  }
+}
 
 const formatDate = (date) =>
   new Date(date).toLocaleString('en-GB', {
@@ -81,7 +98,7 @@ const BoardCard = ({
       title="Click to open in editor · Drag to change status"
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
-        <h4 className="text-sm font-semibold text-text-dark leading-snug break-words flex-1">
+        <h4 className="min-w-0 max-w-full flex-1 text-sm font-semibold text-text-dark leading-snug break-words [overflow-wrap:anywhere]">
           {save.name}
         </h4>
         <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -140,7 +157,8 @@ const BoardColumn = ({
 }) => {
   return (
     <div
-      className={`flex flex-col min-w-[260px] w-[260px] max-h-full rounded-xl transition-colors ${
+      data-column-id={column.id}
+      className={`snap-start [scroll-snap-stop:always] flex flex-col min-w-[260px] w-[260px] max-h-full rounded-xl transition-colors ${
         dragOver ? 'bg-deep-blue/5 ring-2 ring-deep-blue/20' : 'bg-bg-light/80'
       }`}
       onDragOver={(e) => onDragOver(e, column.id)}
@@ -301,7 +319,8 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
   )
 }
 
-export const BoardDashboard = ({ onCreateNew, onLoad }) => {
+export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecoverDraft }) => {
+  const initialPreferences = useMemo(loadDashboardPreferences, [])
   const [saves, setSaves] = useState([])
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -312,7 +331,11 @@ export const BoardDashboard = ({ onCreateNew, onLoad }) => {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('')
-  const [selectedBoardTag, setSelectedBoardTag] = useState('')
+  const [selectedBoardTag, setSelectedBoardTag] = useState(initialPreferences.boardTag)
+  const [monthRange, setMonthRange] = useState(initialPreferences.monthRange)
+  const [newCVOpen, setNewCVOpen] = useState(false)
+  const boardScrollRef = useRef(null)
+  const initialScrollSet = useRef(false)
 
   const fetchBoard = useCallback(async (isRefresh = false) => {
     try {
@@ -335,22 +358,56 @@ export const BoardDashboard = ({ onCreateNew, onLoad }) => {
     fetchBoard()
   }, [fetchBoard])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(DASHBOARD_PREFERENCES_KEY, JSON.stringify({
+        boardTag: selectedBoardTag,
+        monthRange,
+      }))
+    } catch {
+      // Local preferences are optional when storage is unavailable.
+    }
+  }, [selectedBoardTag, monthRange])
+
+  useLayoutEffect(() => {
+    if (loading || !columns.length || initialScrollSet.current) return
+
+    const container = boardScrollRef.current
+    const draftColumn = container?.querySelector('[data-column-id="draft"]')
+    if (!container || !draftColumn) return
+
+    const previousScrollBehavior = container.style.scrollBehavior
+    container.style.scrollBehavior = 'auto'
+    const containerLeft = container.getBoundingClientRect().left
+    const draftLeft = draftColumn.getBoundingClientRect().left
+    container.scrollLeft += draftLeft - containerLeft
+    container.style.scrollBehavior = previousScrollBehavior
+    initialScrollSet.current = true
+  }, [loading, columns])
+
   const boardTags = useMemo(
     () => [...new Set(saves.flatMap((save) => save.tags || []))].sort((a, b) => a.localeCompare(b)),
     [saves],
   )
 
   useEffect(() => {
-    if (selectedBoardTag && !boardTags.includes(selectedBoardTag)) {
+    if (!loading && selectedBoardTag && !boardTags.includes(selectedBoardTag)) {
       setSelectedBoardTag('')
     }
-  }, [boardTags, selectedBoardTag])
+  }, [boardTags, loading, selectedBoardTag])
+
+  const recentSaves = useMemo(() => {
+    if (monthRange === 'all') return saves
+    const cutoff = new Date()
+    cutoff.setMonth(cutoff.getMonth() - monthRange)
+    return saves.filter((save) => new Date(save.lastModified) >= cutoff)
+  }, [saves, monthRange])
 
   const boardSaves = useMemo(
     () => selectedBoardTag
-      ? saves.filter((save) => (save.tags || []).includes(selectedBoardTag))
-      : saves,
-    [saves, selectedBoardTag],
+      ? recentSaves.filter((save) => (save.tags || []).includes(selectedBoardTag))
+      : recentSaves,
+    [recentSaves, selectedBoardTag],
   )
 
   const filteredSaves = useMemo(() => {
@@ -454,12 +511,19 @@ export const BoardDashboard = ({ onCreateNew, onLoad }) => {
   const totalCount = boardSaves.length
 
   return (
-    <div className="h-full min-h-0 bg-[#f1f5f9] flex flex-col print:hidden">
+    <div className="h-full min-h-0 bg-[var(--app-canvas)] flex flex-col print:hidden">
+      <NewCVModal
+        isOpen={newCVOpen}
+        boardTag={selectedBoardTag}
+        saves={boardSaves}
+        onCancel={() => setNewCVOpen(false)}
+        onConfirm={(sourceSave) => onCreateNew(selectedBoardTag, sourceSave)}
+      />
       {/* Header */}
-      <header className="bg-white border-b border-border-light px-3 sm:px-5 py-3 flex items-center gap-2 sm:gap-4 shrink-0">
+      <header className="bg-white border-b border-border-light px-3 sm:px-5 py-3 flex flex-wrap items-center gap-2 sm:gap-4 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <BoardPicker
-            saves={saves}
+            saves={recentSaves}
             tags={boardTags}
             value={selectedBoardTag}
             onChange={setSelectedBoardTag}
@@ -469,10 +533,45 @@ export const BoardDashboard = ({ onCreateNew, onLoad }) => {
           </span>
         </div>
 
+        <div className="flex items-center p-1 bg-bg-light border border-border-light rounded-lg" aria-label="CV age range">
+          {[
+            { value: 2, label: '2m' },
+            { value: 4, label: '4m' },
+            { value: 6, label: '6m' },
+            { value: 'all', label: 'All' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setMonthRange(option.value)}
+              aria-pressed={monthRange === option.value}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                monthRange === option.value
+                  ? 'bg-white text-deep-blue shadow-sm'
+                  : 'text-text-light hover:text-text-dark'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1" />
 
+        {recoverableDraft && (
+          <button
+            type="button"
+            onClick={onRecoverDraft}
+            title={`Local draft saved ${formatDate(recoverableDraft.savedAt)}`}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 border border-border-light text-deep-blue bg-white rounded-lg hover:bg-bg-light transition-colors shrink-0"
+          >
+            <FiClock size={15} />
+            <span className="hidden sm:inline">Recover draft</span>
+          </button>
+        )}
+
         <button
-          onClick={() => onCreateNew(selectedBoardTag)}
+          onClick={() => setNewCVOpen(true)}
           className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 bg-deep-blue text-white rounded-lg hover:bg-light-blue transition-colors shrink-0"
         >
           <FiPlus size={16} />
@@ -514,7 +613,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad }) => {
             </button>
           </div>
         ) : (
-          <div className="h-full overflow-x-auto">
+          <div ref={boardScrollRef} className="h-full overflow-x-auto snap-x snap-mandatory scroll-smooth">
             {error && (
               <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
                 {error}
@@ -536,10 +635,26 @@ export const BoardDashboard = ({ onCreateNew, onLoad }) => {
                   <p className="text-sm text-text-light mt-1">It will appear here after you save it.</p>
                 </div>
                 <button
-                  onClick={() => onCreateNew(selectedBoardTag)}
+                  onClick={() => setNewCVOpen(true)}
                   className="mt-1 text-sm font-medium px-4 py-2 bg-deep-blue text-white rounded-lg hover:bg-light-blue transition-colors"
                 >
                   New CV
+                </button>
+              </div>
+            ) : boardSaves.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                <FiClock size={24} className="text-text-light" />
+                <div>
+                  <h2 className="text-base font-semibold text-text-dark">No recent CVs</h2>
+                  <p className="text-sm text-text-light mt-1">
+                    No CVs were updated in the last {monthRange} months.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMonthRange('all')}
+                  className="text-sm font-medium px-4 py-2 border border-border-light text-deep-blue bg-white rounded-lg hover:bg-bg-light transition-colors"
+                >
+                  View all CVs
                 </button>
               </div>
             ) : (

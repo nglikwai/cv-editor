@@ -1,4 +1,11 @@
-import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 
 const s3Client = new S3Client({
   region: import.meta.env.VITE_S3_REGION,
@@ -13,17 +20,17 @@ const FOLDER = 'willcv'
 const SETTINGS_KEY = 'willcv/settings.json'
 const TAGS_KEY = 'willcv/tags.json'
 const BOARD_KEY = 'willcv/board.json'
+const VERSIONS_FOLDER = `${FOLDER}/versions`
 
 export const DEFAULT_BOARD_COLUMNS = [
+  { id: 'archived', title: 'Archived', color: '#94a3b8' },
   { id: 'draft', title: 'Draft', color: '#64748b' },
-  { id: 'ready', title: 'Ready', color: '#2c5282' },
   { id: 'applied', title: 'Applied', color: '#d4a039' },
   { id: 'phone', title: 'Phone Interview', color: '#0ea5e9' },
   { id: 'video', title: 'Video Interview', color: '#6366f1' },
   { id: 'technical', title: 'Technical Interview', color: '#7c3aed' },
   { id: 'final', title: 'Final Interview', color: '#db2777' },
   { id: 'offer', title: 'Offer', color: '#16a34a' },
-  { id: 'archived', title: 'Archived', color: '#94a3b8' },
 ]
 
 const DEFAULT_BOARD = {
@@ -32,6 +39,8 @@ const DEFAULT_BOARD = {
 }
 
 const cvKey = (name) => `${FOLDER}/${name}.json`
+const versionPrefix = (name) => `${VERSIONS_FOLDER}/${encodeURIComponent(name)}/`
+const versionKey = (name, versionId) => `${versionPrefix(name)}${encodeURIComponent(versionId)}.json`
 
 const loadTags = async () => {
   try {
@@ -65,7 +74,11 @@ export const listSaves = async () => {
     loadBoard().catch(() => ({ ...DEFAULT_BOARD, statuses: {} })),
   ])
   return (response.Contents || [])
-    .filter((obj) => !META_KEYS.has(obj.Key) && obj.Key.endsWith('.json'))
+    .filter((obj) => {
+      if (META_KEYS.has(obj.Key) || !obj.Key.endsWith('.json')) return false
+      const relativeKey = obj.Key.slice(`${FOLDER}/`.length)
+      return !relativeKey.includes('/')
+    })
     .map((obj) => {
       const name = obj.Key.slice(`${FOLDER}/`.length).replace(/\.json$/, '')
       return {
@@ -92,6 +105,47 @@ export const loadFromS3 = async (name) => {
   }
 }
 
+export const listVersions = async (name) => {
+  const prefix = versionPrefix(name)
+  const command = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix })
+  const response = await s3Client.send(command)
+
+  return (response.Contents || [])
+    .filter((object) => object.Key.endsWith('.json'))
+    .map((object) => {
+      const encodedId = object.Key.slice(prefix.length).replace(/\.json$/, '')
+      return {
+        id: decodeURIComponent(encodedId),
+        lastModified: object.LastModified,
+        size: object.Size,
+      }
+    })
+    .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified))
+}
+
+export const loadVersionFromS3 = async (name, versionId) => {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: versionKey(name, versionId),
+    })
+    const response = await s3Client.send(command)
+    const text = await response.Body.transformToString()
+    return JSON.parse(text)
+  } catch (error) {
+    if (error.name === 'NoSuchKey') return null
+    throw error
+  }
+}
+
+export const deleteVersion = async (name, versionId) => {
+  const command = new DeleteObjectCommand({
+    Bucket: BUCKET,
+    Key: versionKey(name, versionId),
+  })
+  await s3Client.send(command)
+}
+
 export const loadLatestFromS3 = async () => {
   const saves = await listSaves()
   if (!saves.length) return { data: null, name: null, tags: [] }
@@ -102,6 +156,20 @@ export const loadLatestFromS3 = async () => {
 export const deleteSave = async (name) => {
   const command = new DeleteObjectCommand({ Bucket: BUCKET, Key: cvKey(name) })
   await s3Client.send(command)
+  const versionsCommand = new ListObjectsV2Command({
+    Bucket: BUCKET,
+    Prefix: versionPrefix(name),
+  })
+  const versions = await s3Client.send(versionsCommand)
+  if (versions.Contents?.length) {
+    await s3Client.send(new DeleteObjectsCommand({
+      Bucket: BUCKET,
+      Delete: {
+        Objects: versions.Contents.map((object) => ({ Key: object.Key })),
+        Quiet: true,
+      },
+    }))
+  }
   const [tags, board] = await Promise.all([loadTags(), loadBoard()])
   const jobs = []
   if (name in tags) {
@@ -115,11 +183,24 @@ export const deleteSave = async (name) => {
   await Promise.all(jobs)
 }
 
-export const saveToS3 = async (data, name, tags = []) => {
+export const saveToS3 = async (data, name, tags = [], createVersion = true) => {
+  const body = JSON.stringify(data, null, 2)
+
+  if (createVersion) {
+    const versionId = new Date().toISOString()
+    const versionCommand = new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: versionKey(name, versionId),
+      Body: body,
+      ContentType: 'application/json',
+    })
+    await s3Client.send(versionCommand)
+  }
+
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: cvKey(name),
-    Body: JSON.stringify(data, null, 2),
+    Body: body,
     ContentType: 'application/json',
   })
   await s3Client.send(command)
@@ -165,13 +246,17 @@ export const loadBoard = async () => {
     const statuses = Object.fromEntries(
       Object.entries(data.statuses || {}).map(([name, status]) => [
         name,
-        status === 'interview' ? 'phone' : status,
+        status === 'interview' ? 'phone' : status === 'ready' ? 'draft' : status,
       ]),
     )
+    const columns = data.columns?.length && !hasLegacyInterviewColumn
+      ? data.columns
+      : DEFAULT_BOARD_COLUMNS
     return {
-      columns: data.columns?.length && !hasLegacyInterviewColumn
-        ? data.columns
-        : DEFAULT_BOARD_COLUMNS,
+      columns: [
+        ...columns.filter((column) => column.id === 'archived'),
+        ...columns.filter((column) => column.id !== 'archived' && column.id !== 'ready'),
+      ],
       statuses,
     }
   } catch (error) {

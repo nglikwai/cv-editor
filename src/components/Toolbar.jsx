@@ -1,13 +1,14 @@
-import { FiClock, FiEdit, FiPrinter, FiSave, FiSettings } from 'react-icons/fi'
+import { FiClock, FiCloud, FiEdit, FiPrinter, FiSave, FiSettings } from 'react-icons/fi'
 import { RiRobot2Line } from 'react-icons/ri'
 
-const ToolbarButton = ({ onClick, disabled, label, children }) => {
+const ToolbarButton = ({ onClick, disabled, label, pressed, children }) => {
   return (
     <div className="relative group">
       <button
-        className="relative p-2.5 border-none rounded-full cursor-pointer text-lg text-black/70 transition-all duration-200 hover:scale-125 hover:text-black active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 before:absolute before:inset-0 before:rounded-full before:opacity-0 before:bg-white/50 before:backdrop-blur-sm before:border before:border-white/60 before:shadow-[inset_0_1px_2px_rgba(255,255,255,0.8)] before:transition-opacity before:duration-200 hover:before:opacity-100"
+        className={`relative p-2.5 border-none rounded-full cursor-pointer text-lg text-black/70 transition-all duration-200 hover:scale-125 hover:text-black active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 before:absolute before:inset-0 before:rounded-full before:opacity-0 before:bg-white/50 before:backdrop-blur-sm before:border before:border-white/60 before:shadow-[inset_0_1px_2px_rgba(255,255,255,0.8)] before:transition-opacity before:duration-200 hover:before:opacity-100 ${pressed ? '!text-green-600 before:!opacity-100 before:!bg-green-50/80' : ''}`}
         onClick={onClick}
         disabled={disabled}
+        aria-pressed={pressed}
       >
         <span className="relative z-10">{children}</span>
       </button>
@@ -22,13 +23,34 @@ const Divider = () => (
   <div className="h-px w-8 bg-white/20 self-center my-1" />
 )
 
-export const Toolbar = ({ onSave, onExportPDF, onEditJson, onAI, onSettings, onVersions, saving }) => {
+export const Toolbar = ({
+  onSave,
+  onExportPDF,
+  onEditJson,
+  onAI,
+  onSettings,
+  onVersions,
+  versionsDisabled,
+  saving,
+  autoSave,
+  autoSaving,
+  autoSaveDisabled,
+  onToggleAutoSave,
+}) => {
   return (
     <div className="toolbar fixed top-1/2 right-4 -translate-y-1/2 bg-white/10 backdrop-blur-md border border-white/20 px-2.5 py-3 flex flex-col items-center gap-2 z-[1000] shadow-[0_4px_24px_rgba(0,0,0,0.15)] rounded-full print:hidden">
       <ToolbarButton onClick={onSave} disabled={saving} label="Save">
         <FiSave />
       </ToolbarButton>
-      <ToolbarButton onClick={onVersions} label="Saved Versions">
+      <ToolbarButton
+        onClick={onToggleAutoSave}
+        disabled={autoSaveDisabled}
+        pressed={autoSave}
+        label={autoSaveDisabled ? 'Auto Save requires the latest saved CV' : autoSaving ? 'Auto-saving…' : `Auto Save: ${autoSave ? 'On' : 'Off'}`}
+      >
+        <FiCloud className={autoSaving ? 'animate-pulse' : ''} />
+      </ToolbarButton>
+      <ToolbarButton onClick={onVersions} disabled={versionsDisabled} label="Saved Versions">
         <FiClock />
       </ToolbarButton>
       <ToolbarButton onClick={onEditJson} label="Edit JSON">

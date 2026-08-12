@@ -36,11 +36,11 @@ export const Summary = ({ summary, updateField }) => {
 
   return (
     <div className="cv-section pt-8 pb-2 px-8">
-      <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
+      <h2 className="cv-text-section flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
         <span className="shrink-0">Professional Summary</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
-      <div className="text-[14px] text-text-dark leading-[1.6]">
+      <div className="cv-configurable-text cv-text-base text-[14px] text-text-dark leading-[1.6]">
         {editing ? (
           <textarea
             ref={editRef}

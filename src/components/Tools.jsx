@@ -17,7 +17,7 @@ export const Tools = ({ tools, dataKey = 'toolsAndTechnologies', updateField }) 
 
   return (
     <div className="cv-section py-4 px-8">
-      <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
+      <h2 className="cv-text-section flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
         <span className="shrink-0">Selected Expertise &amp; Technologies</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
@@ -27,7 +27,7 @@ export const Tools = ({ tools, dataKey = 'toolsAndTechnologies', updateField }) 
           const itemsToRender = showEmpty ? [...items, ''] : (items || [])
 
           return (
-            <div key={category} className="text-base leading-[1.5] flex gap-2">
+            <div key={category} className="cv-configurable-text cv-text-large text-base leading-[1.5] flex gap-2">
               <p className="font-semibold shrink-0 text-deep-blue uppercase text-xs tracking-wide w-36">
                 {categoryLabels[category] || category}:{' '}
               </p>
@@ -38,7 +38,7 @@ export const Tools = ({ tools, dataKey = 'toolsAndTechnologies', updateField }) 
                     <EditableInput
                       value={item}
                       onChange={(value) => handleToolChange(category, index, value)}
-                      className="inline text-base text-text-dark"
+                      className="cv-configurable-text cv-text-large inline text-base text-text-dark"
                       placeholder={index >= (items?.length || 0) ? 'Add...' : ''}
                     />
                   </span>

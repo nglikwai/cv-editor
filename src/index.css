@@ -12,9 +12,178 @@
   --color-border-light: #e2e8f0;
 }
 
+:root {
+  --app-canvas: #f1f5f9;
+  --cv-color-deep-blue: #1a365d;
+  --cv-color-golden-yellow: #d4a039;
+  --cv-color-light-blue: #2c5282;
+  --cv-color-text-dark: #334155;
+  --cv-color-text-light: #64748b;
+  --cv-color-bg-light: #f8fafc;
+  --cv-color-golden-hover: #8a8260;
+  --cv-color-light-blue-hover: #2b4a6f;
+  --cv-color-border-light: #e2e8f0;
+}
+
 * {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+
+.cv-container .cv-section {
+  padding-top: var(--cv-section-spacing, 16px);
+  padding-bottom: var(--cv-section-spacing, 16px);
+}
+
+.cv-container .cv-header {
+  padding-top: calc(var(--cv-section-spacing, 16px) + 24px);
+  padding-bottom: calc(var(--cv-section-spacing, 16px) + 24px);
+}
+
+.cv-container .cv-section > h2 {
+  margin-bottom: var(--cv-section-spacing, 16px);
+}
+
+.cv-container .cv-job-spacing {
+  padding-bottom: var(--cv-job-spacing, 24px);
+}
+
+.cv-container .cv-job-item-spacing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cv-job-item-spacing, 8px);
+}
+
+.cv-container .cv-configurable-text {
+  line-height: var(--cv-line-height, 1.5);
+}
+
+.cv-container .cv-text-base {
+  font-size: var(--cv-text-size, 14px);
+  line-height: var(--cv-line-height, 1.5);
+}
+
+.cv-container .cv-text-small {
+  font-size: calc(var(--cv-text-size, 14px) - 2px);
+  line-height: max(1.2, calc(var(--cv-line-height, 1.5) - 0.1));
+}
+
+.cv-container .cv-text-section {
+  font-size: calc(var(--cv-text-size, 14px) - 2px);
+  line-height: max(1.15, calc(var(--cv-line-height, 1.5) - 0.25));
+}
+
+.cv-container .cv-text-medium {
+  font-size: calc(var(--cv-text-size, 14px) - 1px);
+  line-height: max(1.2, calc(var(--cv-line-height, 1.5) - 0.05));
+}
+
+.cv-container .cv-text-large {
+  font-size: var(--cv-text-size, 14px);
+  line-height: var(--cv-line-height, 1.5);
+}
+
+.cv-container .cv-text-role {
+  font-size: calc(var(--cv-text-size, 14px) + 3px);
+  line-height: max(1.15, calc(var(--cv-line-height, 1.5) - 0.25));
+}
+
+.cv-container .cv-text-title {
+  font-size: calc(var(--cv-text-size, 14px) + 16px);
+  line-height: max(1.05, calc(var(--cv-line-height, 1.5) - 0.35));
+}
+
+.cv-container .cv-configurable-text::before {
+  font-size: inherit;
+}
+
+.dark-ui {
+  color-scheme: dark;
+  --app-canvas: #181818;
+  --color-deep-blue: #3794ff;
+  --color-golden-yellow: #cca700;
+  --color-light-blue: #0078d4;
+  --color-text-dark: #cccccc;
+  --color-text-light: #969696;
+  --color-bg-light: #252526;
+  --color-golden-hover: #e5b900;
+  --color-light-blue-hover: #026ec1;
+  --color-border-light: #3c3c3c;
+}
+
+.dark-ui .bg-white {
+  background-color: #1f1f1f;
+}
+
+.dark-ui .bg-white\/80 {
+  background-color: rgb(31 31 31 / 0.92);
+}
+
+.dark-ui .bg-white\/50 {
+  background-color: rgb(31 31 31 / 0.72);
+}
+
+.dark-ui .bg-gray-50,
+.dark-ui .bg-gray-100 {
+  background-color: #252526;
+}
+
+.dark-ui .bg-gray-50\/80,
+.dark-ui .bg-gray-200\/60 {
+  background-color: rgb(37 37 38 / 0.9);
+}
+
+.dark-ui .border-gray-100,
+.dark-ui .border-gray-200,
+.dark-ui .border-gray-300 {
+  border-color: #3c3c3c;
+}
+
+.dark-ui .text-gray-400,
+.dark-ui .text-gray-500 {
+  color: #969696;
+}
+
+.dark-ui .text-gray-600,
+.dark-ui .text-gray-700 {
+  color: #cccccc;
+}
+
+.dark-ui :where(input:not([type='color']):not([type='range']), select, textarea) {
+  background-color: #181818;
+  color: #cccccc;
+}
+
+.dark-ui :where(input, textarea)::placeholder {
+  color: #6e6e6e;
+}
+
+.dark-ui .toolbar button {
+  color: #cccccc;
+}
+
+.dark-ui .cv-container {
+  color-scheme: light;
+  --color-deep-blue: var(--cv-color-deep-blue);
+  --color-golden-yellow: var(--cv-color-golden-yellow);
+  --color-light-blue: var(--cv-color-light-blue);
+  --color-text-dark: var(--cv-color-text-dark);
+  --color-text-light: var(--cv-color-text-light);
+  --color-bg-light: var(--cv-color-bg-light);
+  --color-golden-hover: var(--cv-color-golden-hover);
+  --color-light-blue-hover: var(--cv-color-light-blue-hover);
+  --color-border-light: var(--cv-color-border-light);
+  background-color: white;
+  color: var(--cv-color-text-dark);
+}
+
+.dark-ui .cv-container :where(input:not([type='color']):not([type='range']), select, textarea) {
+  background-color: transparent;
+  color: inherit;
+}
+
+.dark-ui .cv-container :where(input, textarea)::placeholder {
+  color: inherit;
 }
 
 @page {

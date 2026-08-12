@@ -7,16 +7,16 @@ export const Header = ({ basics, updateField }) => {
 
   return (
     <div className="cv-header bg-deep-blue text-white py-10 px-8">
-      <div className="text-3xl font-black text-white mb-1 tracking-[0.12em] uppercase">
+      <div className="cv-text-title text-3xl font-black text-white mb-1 tracking-[0.12em] uppercase">
         <EditableInput
           value={name?.full}
           onChange={(v) => updateField('basics.name.full', v)}
-          className="text-3xl font-black tracking-[0.12em] uppercase text-white"
+          className="cv-text-title text-3xl font-black tracking-[0.12em] uppercase text-white"
         />
       </div>
       <div className="flex items-center gap-2.5 mb-4">
         <span className="w-6 h-px bg-golden-yellow shrink-0" />
-        <div className="text-sm text-golden-yellow font-medium tracking-wider">
+        <div className="cv-configurable-text cv-text-base text-sm text-golden-yellow font-medium tracking-wider">
           <EditableInput
             value={headline}
             onChange={(v) => updateField('basics.headline', v)}
@@ -24,7 +24,7 @@ export const Header = ({ basics, updateField }) => {
           />
         </div>
       </div>
-      <div className="flex flex-wrap gap-y-1 gap-x-5 text-sm text-slate-200">
+      <div className="cv-configurable-text cv-text-base flex flex-wrap gap-y-1 gap-x-5 text-sm text-slate-200">
         <div className="flex items-center gap-1.5">
           <svg
             className="w-3.5 h-3.5 text-golden-yellow shrink-0"
@@ -42,7 +42,7 @@ export const Header = ({ basics, updateField }) => {
           <EditableInput
             value={contacts?.phone}
             onChange={(v) => updateField('basics.contacts.phone', v)}
-            className="w-auto min-w-20 text-sm text-slate-200"
+            className="cv-configurable-text cv-text-base w-auto min-w-20 text-sm text-slate-200"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -62,7 +62,7 @@ export const Header = ({ basics, updateField }) => {
           <EditableInput
             value={contacts?.email}
             onChange={(v) => updateField('basics.contacts.email', v)}
-            className="w-auto min-w-20 text-sm text-slate-200"
+            className="cv-configurable-text cv-text-base w-auto min-w-20 text-sm text-slate-200"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -72,7 +72,7 @@ export const Header = ({ basics, updateField }) => {
           <EditableInput
             value={contacts?.linkedin?.label}
             onChange={(v) => updateField('basics.contacts.linkedin.label', v)}
-            className="w-auto min-w-20 text-sm text-slate-200"
+            className="cv-configurable-text cv-text-base w-auto min-w-20 text-sm text-slate-200"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -93,12 +93,12 @@ export const Header = ({ basics, updateField }) => {
           <EditableInput
             value={location?.country}
             onChange={(v) => updateField('basics.location.country', v)}
-            className="w-auto min-w-16 text-sm text-slate-200"
+            className="cv-configurable-text cv-text-base w-auto min-w-16 text-sm text-slate-200"
           />
         </div>
       </div>
       {(workAuthorization?.length > 0 || driving?.notes || travel?.notes) && (
-        <div className="flex flex-wrap gap-x-3 text-xs text-slate-300 mt-2 pt-2 border-t border-white/20">
+        <div className="cv-configurable-text cv-text-small flex flex-wrap gap-x-3 text-xs text-slate-300 mt-2 pt-2 border-t border-white/20">
           {workAuthorization?.map((auth, i) => (
             <span
               key={i}

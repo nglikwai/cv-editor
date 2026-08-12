@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { FiX } from 'react-icons/fi'
+import { FiCopy, FiFilePlus, FiRefreshCw, FiX } from 'react-icons/fi'
 
 const sanitize = (name) =>
   name.trim().replace(/[^a-zA-Z0-9\-_. ]/g, '').slice(0, 80)
 
-export const SaveNameModal = ({ isOpen, onConfirm, onCancel, defaultName, defaultTags = [], allTags = [] }) => {
+export const SaveNameModal = ({
+  isOpen,
+  onConfirm,
+  onCancel,
+  defaultName,
+  defaultTags = [],
+  allTags = [],
+  existingNames = [],
+}) => {
+  const [mode, setMode] = useState('new')
   const [name, setName] = useState('')
   const [tags, setTags] = useState([])
   const [tagInput, setTagInput] = useState('')
@@ -12,6 +21,7 @@ export const SaveNameModal = ({ isOpen, onConfirm, onCancel, defaultName, defaul
 
   useEffect(() => {
     if (isOpen) {
+      setMode(defaultName ? 'replace' : 'new')
       setName(defaultName || '')
       setTags(defaultTags)
       setTagInput('')
@@ -30,14 +40,23 @@ export const SaveNameModal = ({ isOpen, onConfirm, onCancel, defaultName, defaul
     setTags((prev) => prev.filter((t) => t !== tag))
   }
 
+  const selectMode = (nextMode) => {
+    setMode(nextMode)
+    setName(nextMode === 'new' ? '' : defaultName)
+    if (nextMode === 'new') setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
   const handleConfirm = () => {
     const safe = sanitize(name)
     if (!safe) return
+    if (mode === 'new' && existingNames.some(
+      (existingName) => existingName.toLowerCase() === safe.toLowerCase(),
+    )) return
     const pending = tagInput.trim()
     const finalTags = pending && !tags.some((t) => t.toLowerCase() === pending.toLowerCase())
       ? [...tags, pending]
       : tags
-    onConfirm(safe, finalTags)
+    onConfirm(safe, finalTags, mode)
   }
 
   const handleNameKeyDown = (e) => {
@@ -69,22 +88,87 @@ export const SaveNameModal = ({ isOpen, onConfirm, onCancel, defaultName, defaul
   if (!isOpen) return null
 
   const safe = sanitize(name)
+  const nameExists = mode === 'new' && existingNames.some(
+    (existingName) => existingName.toLowerCase() === safe.toLowerCase(),
+  )
+  const canSave = !!safe && !nameExists
   const tagSuggestions = allTags.filter((t) => !tags.some((existing) => existing.toLowerCase() === t.toLowerCase()))
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] print:hidden">
-      <div className="bg-white rounded-xl shadow-2xl w-96 p-6">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
-          Name this save
+      <div className="bg-white rounded-xl shadow-2xl w-[36rem] max-w-[calc(100vw-2rem)] p-6">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-deep-blue">
+          Save CV
         </h3>
+        <p className="text-xs text-text-light mt-1 mb-4">
+          {defaultName ? 'Replace this CV, add to its history, or save it as a separate CV.' : 'Create your first saved CV.'}
+        </p>
+
+        {defaultName && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => selectMode('replace')}
+              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors ${
+                mode === 'replace'
+                  ? 'border-deep-blue bg-deep-blue/5 ring-2 ring-deep-blue/10'
+                  : 'border-border-light hover:bg-bg-light'
+              }`}
+            >
+              <FiRefreshCw className={mode === 'replace' ? 'text-deep-blue' : 'text-text-light'} />
+              <span>
+                <span className="block text-xs font-semibold text-text-dark">Replace original</span>
+                <span className="block text-[10px] text-text-light mt-0.5">No new history entry</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMode('version')}
+              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors ${
+                mode === 'version'
+                  ? 'border-deep-blue bg-deep-blue/5 ring-2 ring-deep-blue/10'
+                  : 'border-border-light hover:bg-bg-light'
+              }`}
+            >
+              <FiCopy className={mode === 'version' ? 'text-deep-blue' : 'text-text-light'} />
+              <span>
+                <span className="block text-xs font-semibold text-text-dark">New version</span>
+                <span className="block text-[10px] text-text-light mt-0.5">Same CV history</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMode('new')}
+              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors ${
+                mode === 'new'
+                  ? 'border-deep-blue bg-deep-blue/5 ring-2 ring-deep-blue/10'
+                  : 'border-border-light hover:bg-bg-light'
+              }`}
+            >
+              <FiFilePlus className={mode === 'new' ? 'text-deep-blue' : 'text-text-light'} />
+              <span>
+                <span className="block text-xs font-semibold text-text-dark">New CV</span>
+                <span className="block text-[10px] text-text-light mt-0.5">Separate CV and history</span>
+              </span>
+            </button>
+          </div>
+        )}
+
+        <label className="block text-xs font-semibold text-text-dark mb-1.5">CV name</label>
         <input
           ref={inputRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleNameKeyDown}
-          className="w-full border border-border-light rounded-lg px-3 py-2 text-sm text-text-dark focus:outline-none focus:ring-2 focus:ring-deep-blue/30"
+          readOnly={!!defaultName && mode !== 'new'}
+          className="w-full border border-border-light rounded-lg px-3 py-2 text-sm text-text-dark focus:outline-none focus:ring-2 focus:ring-deep-blue/30 read-only:bg-bg-light read-only:text-text-light read-only:cursor-not-allowed"
         />
+        {nameExists && (
+          <p className="text-xs text-red-600 mt-1.5">
+            This CV already exists. Open it from the dashboard to save a new version.
+          </p>
+        )}
 
         <h3 className="text-xs font-bold uppercase tracking-widest text-deep-blue mt-4 mb-2">
           Tags
@@ -144,10 +228,16 @@ export const SaveNameModal = ({ isOpen, onConfirm, onCancel, defaultName, defaul
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!safe}
+            disabled={!canSave}
             className="px-4 py-2 text-sm bg-deep-blue text-white rounded-lg hover:bg-light-blue transition-colors disabled:opacity-40"
           >
-            Save
+            {mode === 'version'
+              ? 'Save new version'
+              : mode === 'replace'
+                ? 'Replace original'
+                : defaultName
+                  ? 'Save as new CV'
+                  : 'Create CV'}
           </button>
         </div>
       </div>

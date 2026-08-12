@@ -120,7 +120,7 @@ export const Experience = ({ experience, updateField }) => {
 
   return (
     <div className="cv-section py-4 px-8">
-      <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
+      <h2 className="cv-text-section flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-4">
         <span className="shrink-0">Professional Experience</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />
       </h2>
@@ -158,22 +158,22 @@ export const Experience = ({ experience, updateField }) => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 pb-10 print:pb-4">
+                <div className={`flex-1 ${hasNextReal ? 'cv-job-spacing' : ''}`}>
                   <div className="flex flex-col gap-[3px]">
                     {/* Role + date row */}
                     <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-[12.75pt] text-deep-blue leading-none">
+                      <div className="cv-text-role font-semibold text-[12.75pt] text-deep-blue leading-none">
                         {isEmptyTrailer ? (
-                          <EditableInput value={exp.role} onChange={(v) => updateField(`experience[${expIndex}].role`, v)} className="font-semibold text-[12.75pt]" placeholder="Add role..." />
+                          <EditableInput value={exp.role} onChange={(v) => updateField(`experience[${expIndex}].role`, v)} className="cv-text-role font-semibold text-[12.75pt]" placeholder="Add role..." />
                         ) : editingId === roleId ? (
                           <input {...editProps} className={`${inlineEditClass} w-full`} />
                         ) : (
                           <DisplaySpan id={roleId} value={exp.role} placeholder="Add role..." />
                         )}
                       </div>
-                      <div className="text-[9.75pt] text-white bg-deep-blue py-0.5 px-2.5 rounded-full font-medium shrink-0">
+                      <div className="cv-text-small text-[9.75pt] text-white bg-deep-blue py-0.5 px-2.5 rounded-full font-medium shrink-0">
                         {isEmptyTrailer ? (
-                          <EditableInput value={dateDisplay} onChange={(v) => updateField(`experience[${expIndex}].dateDisplay`, v)} className="text-[9.75pt] w-auto min-w-16 text-white" placeholder="Date range" />
+                          <EditableInput value={dateDisplay} onChange={(v) => updateField(`experience[${expIndex}].dateDisplay`, v)} className="cv-text-small text-[9.75pt] w-auto min-w-16 text-white" placeholder="Date range" />
                         ) : editingId === dateId ? (
                           <input {...editProps} className={`${inlineEditClass} text-white min-w-16`} />
                         ) : (
@@ -183,7 +183,7 @@ export const Experience = ({ experience, updateField }) => {
                     </div>
 
                     {/* Company / location */}
-                    <div className="text-[10.5pt] text-text-light leading-none">
+                    <div className="cv-configurable-text cv-text-base text-[10.5pt] text-text-light leading-none">
                       {isEmptyTrailer ? (
                         <EditableInput
                           value={companyDisplay}
@@ -192,7 +192,7 @@ export const Experience = ({ experience, updateField }) => {
                             updateField(`experience[${expIndex}].company`, parts[0])
                             if (parts.length > 1) updateField(`experience[${expIndex}].location`, parts.slice(1).join(', '))
                           }}
-                          className="text-[10.5pt] text-text-light"
+                          className="cv-configurable-text cv-text-base text-[10.5pt] text-text-light"
                           placeholder="Company, Location"
                         />
                       ) : editingId === companyId ? (
@@ -204,7 +204,7 @@ export const Experience = ({ experience, updateField }) => {
 
                     {/* Focus */}
                     {!isEmptyTrailer && (
-                      <div className={`mt-2 text-[9.75pt] text-text-light italic leading-snug ${!exp.focus && editingId !== focusId ? 'print:hidden' : ''}`}>
+                      <div className={`cv-configurable-text cv-text-small mt-2 text-[9.75pt] text-text-light italic leading-snug ${!exp.focus && editingId !== focusId ? 'print:hidden' : ''}`}>
                         {editingId === focusId ? (
                           <textarea {...editProps} className={blockEditClass} rows={1} />
                         ) : (
@@ -218,7 +218,7 @@ export const Experience = ({ experience, updateField }) => {
 
                   {/* Highlights */}
                   {highlightsToRender.length > 0 && (
-                    <ul className="mt-2 space-y-2">
+                    <ul className="cv-job-item-spacing mt-2">
                       {highlightsToRender.map((highlight, hIndex) => {
                         const isTrailer = hIndex >= highlights.length
                         const id = `${expIndex}-${hIndex}`
@@ -228,7 +228,7 @@ export const Experience = ({ experience, updateField }) => {
                           <li
                             key={hIndex}
                             className={[
-                              "pl-4 relative text-[10.5pt] text-text-dark leading-[1.6]",
+                              "cv-configurable-text cv-text-base pl-4 relative text-[10.5pt] text-text-dark leading-[1.6]",
                               "before:content-['▸'] before:absolute before:left-0 before:top-0 before:text-golden-yellow before:text-[10.5pt]",
                               isTrailer ? 'print:hidden' : '',
                             ].filter(Boolean).join(' ')}

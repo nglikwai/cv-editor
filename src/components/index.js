@@ -11,5 +11,12 @@ export { Toolbar } from './Toolbar'
 export { CVPage } from './CVPage'
 export { AppLayout } from './AppLayout'
 export { BoardDashboard } from './BoardDashboard'
+export { NewCVModal } from './NewCVModal'
 export { JsonEditorModal } from './JsonEditorModal'
-export { SettingsModal, DEFAULT_SETTINGS, applyThemeColors } from './SettingsModal'
+export {
+  SettingsModal,
+  DEFAULT_SETTINGS,
+  applyTemplateLayout,
+  applyThemeColors,
+  normalizeSettings,
+} from './SettingsModal'
