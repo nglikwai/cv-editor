@@ -1,7 +1,7 @@
 {
-  "name": "cv",
+  "name": "vellum",
   "version": "1.0.0",
-  "description": "CV Generator - Modern UK-style CV template",
+  "description": "Vellum — write, version, and track your CVs",
   "type": "module",
   "scripts": {
     "dev": "next dev",

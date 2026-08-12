@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiCheck, FiChevronDown, FiColumns, FiEdit3, FiFileText, FiLayout, FiMoon, FiPlus, FiSun, FiUser } from 'react-icons/fi'
+import { FiCheck, FiChevronDown, FiColumns, FiEdit3, FiLayout, FiMoon, FiPlus, FiSun, FiUser } from 'react-icons/fi'
 
 const NavButton = ({ active, icon, label, onClick }) => (
   <button
@@ -40,12 +40,19 @@ export const AppLayout = ({
     <header className="h-16 shrink-0 bg-white border-b border-border-light shadow-sm z-[1200] print:hidden">
       <div className="h-full px-3 sm:px-5 flex items-center gap-3 sm:gap-6">
         <div className="flex items-center gap-2.5 shrink-0">
-          <span className="w-9 h-9 rounded-xl bg-deep-blue text-white flex items-center justify-center shadow-sm">
-            <FiFileText size={18} />
+          <span className="w-9 h-9 rounded-xl bg-deep-blue text-white flex items-center justify-center shadow-sm overflow-hidden">
+            <svg viewBox="0 0 32 32" className="w-full h-full" aria-hidden="true">
+              <rect width="32" height="32" rx="8" fill="#1a365d" />
+              <path
+                d="M9 8.5h9.2c2.9 0 5.3 2.3 5.3 5.2v0.2c0 2.9-2.4 5.2-5.3 5.2H12.5V23.5H9V8.5zm3.5 3.2v4.2h5.5c1.1 0 2-0.9 2-2.1v-0.1c0-1.1-0.9-2-2-2H12.5z"
+                fill="#ffffff"
+              />
+              <rect x="20.5" y="20.2" width="5" height="3.2" rx="1" fill="#d4a039" />
+            </svg>
           </span>
           <div className="hidden md:block leading-tight">
-            <p className="text-sm font-bold text-deep-blue">CV Workspace</p>
-            <p className="text-[10px] uppercase tracking-wider text-text-light">Applications</p>
+            <p className="text-sm font-bold text-deep-blue">Vellum</p>
+            <p className="text-[10px] uppercase tracking-wider text-text-light">CV &amp; applications</p>
           </div>
         </div>
 

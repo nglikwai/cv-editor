@@ -1,8 +1,9 @@
 import '../src/index.css'
 
 export const metadata = {
-  title: 'CV Workspace',
-  description: 'Manage and edit your CVs',
+  title: 'Vellum',
+  description: 'Write, version, and track your CVs',
+  applicationName: 'Vellum',
 }
 
 export default function RootLayout({ children }) {
