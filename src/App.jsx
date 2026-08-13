@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { Toolbar } from './components/Toolbar'
+import { ScratchNotes } from './components/ScratchNotes'
 import { AppLayout } from './components/AppLayout'
 import { CVPage, CV_TEMPLATES } from './components/CVPage'
 import { BoardDashboard } from './components/BoardDashboard'
@@ -723,6 +724,13 @@ function App() {
         </div>
       ) : (
         <>
+          <ScratchNotes
+            value={cvData.notes}
+            onChange={(notes) => updateField('notes', notes)}
+            cvName={currentSaveName}
+            userId={activeUser.id}
+            refreshKey={`${saving ? 1 : 0}:${autoSaving ? 1 : 0}`}
+          />
           <Toolbar
             onSave={handleSave}
             onExportPDF={handleExportPDF}

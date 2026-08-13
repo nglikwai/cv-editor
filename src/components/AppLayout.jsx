@@ -51,7 +51,7 @@ export const AppLayout = ({
             </svg>
           </span>
           <div className="hidden md:block leading-tight">
-            <p className="text-sm font-bold text-deep-blue">Vellum</p>
+            <p className="text-sm font-bold text-deep-blue">CV Workspace</p>
             <p className="text-[10px] uppercase tracking-wider text-text-light">CV &amp; applications</p>
           </div>
         </div>

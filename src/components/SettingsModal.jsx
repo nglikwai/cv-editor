@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS = {
     experienceFocusSpacingY: 5,
     certificationSpacing: 16,
     skillSpacing: 16,
+    pageMarginTop: 4,
   },
   aiPromptTemplate: `I want to ask you to help me improve my CV. Here is my current CV data:\n\n{cv_json}`,
 }
@@ -38,6 +39,7 @@ export const TEMPLATE_LAYOUT_DEFAULTS = {
     experienceFocusSpacingY: 8,
     certificationSpacing: 2,
     skillSpacing: 8,
+    pageMarginTop: 4,
   },
 }
 
@@ -70,6 +72,7 @@ export const normalizeSettings = (settings = {}, templateId = 'classic') => {
       experienceFocusSpacingY: clampNumber(layout.experienceFocusSpacingY, 0, 24, layoutDefaults.experienceFocusSpacingY),
       certificationSpacing: clampNumber(layout.certificationSpacing, 0, 32, layoutDefaults.certificationSpacing),
       skillSpacing: clampNumber(layout.skillSpacing, 0, 32, layoutDefaults.skillSpacing),
+      pageMarginTop: clampNumber(layout.pageMarginTop, 0, 20, layoutDefaults.pageMarginTop),
     },
   }
 }
@@ -121,6 +124,7 @@ export const applyTemplateLayout = (templateLayout) => {
   root.style.setProperty('--cv-experience-focus-spacing-y', `${layout.experienceFocusSpacingY}px`)
   root.style.setProperty('--cv-certification-spacing', `${layout.certificationSpacing}px`)
   root.style.setProperty('--cv-skill-spacing', `${layout.skillSpacing}px`)
+  root.style.setProperty('--cv-page-margin-top', `${layout.pageMarginTop}mm`)
 }
 
 const LayoutControl = ({ label, value, min, max, step, suffix = '', onChange }) => (
@@ -358,6 +362,18 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
                   step={1}
                   suffix="px"
                   onChange={(value) => handleLayoutChange('headerPaddingY', value)}
+                />
+              </LayoutGroup>
+
+              <LayoutGroup title="Page" description="Applies to printed pages after the first.">
+                <LayoutControl
+                  label="Top margin (pages 2+)"
+                  value={layout.pageMarginTop}
+                  min={0}
+                  max={20}
+                  step={0.5}
+                  suffix="mm"
+                  onChange={(value) => handleLayoutChange('pageMarginTop', value)}
                 />
               </LayoutGroup>
 

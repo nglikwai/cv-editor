@@ -214,12 +214,18 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
 
   const options = useMemo(
     () => [
-      { value: '', label: 'All job types', count: saves.length },
-      ...tags.map((tag) => ({
-        value: tag,
-        label: tag,
-        count: saves.filter((save) => (save.tags || []).includes(tag)).length,
-      })),
+      ...tags
+        .map((tag) => ({
+          value: tag,
+          label: tag,
+          count: saves.filter((save) => (save.tags || []).includes(tag)).length,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      {
+        value: '',
+        label: 'Uncategorized',
+        count: saves.filter((save) => !(save.tags || []).length).length,
+      },
     ],
     [saves, tags],
   )
@@ -286,7 +292,7 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
               const selected = option.value === value
               return (
                 <button
-                  key={option.value || 'all'}
+                  key={option.value || 'uncategorized'}
                   type="button"
                   role="option"
                   aria-selected={selected}
@@ -321,7 +327,6 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
 }
 
 export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecoverDraft, userId = 'default' }) => {
-  const [initialPreferences, setInitialPreferences] = useState({ boardTag: '', monthRange: 2 })
   const [saves, setSaves] = useState([])
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -332,21 +337,20 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('')
-  const [selectedBoardTag, setSelectedBoardTag] = useState(initialPreferences.boardTag)
-  const [monthRange, setMonthRange] = useState(initialPreferences.monthRange)
+  const [selectedBoardTag, setSelectedBoardTag] = useState('')
+  const [monthRange, setMonthRange] = useState(2)
+  const [prefsUserId, setPrefsUserId] = useState(null)
   const [newCVOpen, setNewCVOpen] = useState(false)
   const boardScrollRef = useRef(null)
   const initialScrollSet = useRef(false)
 
   useEffect(() => {
-    setInitialPreferences(loadDashboardPreferences(userId))
-  }, [userId])
-
-  useEffect(() => {
-    setSelectedBoardTag(initialPreferences.boardTag)
-    setMonthRange(initialPreferences.monthRange)
+    const preferences = loadDashboardPreferences(userId)
+    setSelectedBoardTag(preferences.boardTag)
+    setMonthRange(preferences.monthRange)
+    setPrefsUserId(userId)
     initialScrollSet.current = false
-  }, [initialPreferences])
+  }, [userId])
 
   const fetchBoard = useCallback(async (isRefresh = false) => {
     try {
@@ -370,6 +374,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
   }, [fetchBoard])
 
   useEffect(() => {
+    if (prefsUserId !== userId) return
     try {
       localStorage.setItem(workspaceStorageKey(DASHBOARD_PREFERENCES_KEY, userId), JSON.stringify({
         boardTag: selectedBoardTag,
@@ -378,7 +383,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
     } catch {
       // Local preferences are optional when storage is unavailable.
     }
-  }, [selectedBoardTag, monthRange, userId])
+  }, [selectedBoardTag, monthRange, userId, prefsUserId])
 
   useLayoutEffect(() => {
     if (loading || !columns.length || initialScrollSet.current) return
@@ -417,7 +422,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
   const boardSaves = useMemo(
     () => selectedBoardTag
       ? recentSaves.filter((save) => (save.tags || []).includes(selectedBoardTag))
-      : recentSaves,
+      : recentSaves.filter((save) => !(save.tags || []).length),
     [recentSaves, selectedBoardTag],
   )
 

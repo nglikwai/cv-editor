@@ -19,5 +19,6 @@ export const saveToS3 = (data, name, tags = [], createVersion = true, userId = '
 export const loadSettings = () => request('loadSettings')
 export const saveSettings = (data) => request('saveSettings', { data })
 export const loadBoard = (userId = 'default') => request('loadBoard', { userId })
+export const getCvTimeline = (name, userId = 'default') => request('getCvTimeline', { name, userId })
 export const updateSaveStatus = (name, status, userId = 'default') => request('updateSaveStatus', { name, status, userId })
 

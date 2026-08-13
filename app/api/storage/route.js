@@ -4,6 +4,7 @@ import {
   listSaves,
   listVersions,
   loadBoard,
+  getCvTimeline,
   loadFromS3,
   loadSettings,
   loadVersionFromS3,
@@ -26,6 +27,7 @@ const operations = {
   loadSettings: () => loadSettings(),
   saveSettings: ({ data }) => saveSettings(data),
   loadBoard: ({ userId }) => loadBoard(userId),
+  getCvTimeline: ({ name, userId }) => getCvTimeline(name, userId),
   updateSaveStatus: ({ name, status, userId }) => updateSaveStatus(name, status, userId),
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "vellum",
   "version": "1.0.0",
-  "description": "Vellum — write, version, and track your CVs",
+  "description": "CV Workspace — write, version, and track your CVs",
   "type": "module",
   "scripts": {
     "dev": "next dev",

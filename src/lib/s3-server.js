@@ -4,6 +4,7 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -65,6 +66,7 @@ export const DEFAULT_BOARD_COLUMNS = [
 const DEFAULT_BOARD = {
   columns: DEFAULT_BOARD_COLUMNS,
   statuses: {},
+  timeline: {},
 }
 
 const userFolder = (userId = 'default') => userId === 'default'
@@ -109,7 +111,7 @@ const saveTags = async (tags, userId = 'default') => {
   await getS3Client().send(command)
 }
 
-const META_KEYS = new Set([SETTINGS_KEY, TAGS_KEY, BOARD_KEY, `${FOLDER}/`])
+const META_FILE_NAMES = new Set(['settings.json', 'tags.json', 'board.json'])
 
 export const listSaves = async (userId = 'default') => {
   const prefix = `${userFolder(userId)}/`
@@ -125,10 +127,12 @@ export const listSaves = async (userId = 'default') => {
   const objects = [...(response.Contents || []), ...(legacyResponse.Contents || [])]
   return objects
     .filter((obj) => {
-      if (obj.Key === userTagsKey(userId) || obj.Key === userBoardKey(userId) || !obj.Key.endsWith('.json')) return false
+      if (!obj.Key.endsWith('.json')) return false
       const sourcePrefix = obj.Key.startsWith(prefix) ? prefix : `${LEGACY_FOLDER}/`
       const relativeKey = obj.Key.slice(sourcePrefix.length)
-      return !relativeKey.includes('/')
+      // Exclude workspace meta files (settings/tags/board) that sit next to CV JSON.
+      if (META_FILE_NAMES.has(relativeKey) || relativeKey.includes('/')) return false
+      return true
     })
     .map((obj) => {
       const sourcePrefix = obj.Key.startsWith(prefix) ? prefix : `${LEGACY_FOLDER}/`
@@ -243,18 +247,21 @@ export const deleteSave = async (name, userId = 'default') => {
     delete tags[name]
     jobs.push(saveTags(tags, userId))
   }
-  if (name in board.statuses) {
+  if (name in board.statuses || name in (board.timeline || {})) {
     delete board.statuses[name]
+    if (board.timeline) delete board.timeline[name]
     jobs.push(saveBoard(board, userId))
   }
   await Promise.all(jobs)
 }
 
 export const saveToS3 = async (data, name, tags = [], createVersion = true, userId = 'default') => {
+  const existed = await cvObjectExists(name, userId)
   const body = JSON.stringify(data, null, 2)
+  let versionId = null
 
   if (createVersion) {
-    const versionId = new Date().toISOString()
+    versionId = new Date().toISOString()
     const versionCommand = new PutObjectCommand({
       Bucket: BUCKET,
       Key: versionKey(name, versionId, userId),
@@ -281,6 +288,13 @@ export const saveToS3 = async (data, name, tags = [], createVersion = true, user
     delete allTags[name]
   }
   await saveTags(allTags, userId)
+  if (!existed) {
+    await appendTimelineEvent(userId, name, { type: 'created' })
+  } else if (createVersion) {
+    await appendTimelineEvent(userId, name, { type: 'version', versionId })
+  } else {
+    await appendTimelineEvent(userId, name, { type: 'edited' })
+  }
 }
 
 export const loadSettings = async () => {
@@ -331,16 +345,17 @@ export const loadBoard = async (userId = 'default') => {
         ...columns.filter((column) => column.id !== 'archived' && column.id !== 'ready'),
       ],
       statuses,
+      timeline: data.timeline || {},
     }
   } catch (error) {
     if (error.name === 'NoSuchKey' && userId === 'default') {
       const legacy = await getS3Client().send(new GetObjectCommand({ Bucket: BUCKET, Key: legacyBoardKey, ResponseCacheControl: NO_CACHE })).catch(() => null)
       if (legacy) {
         const data = JSON.parse(await legacy.Body.transformToString())
-        return { ...data, statuses: data.statuses || {} }
+        return { ...data, statuses: data.statuses || {}, timeline: data.timeline || {} }
       }
     }
-    if (error.name === 'NoSuchKey') return { ...DEFAULT_BOARD, statuses: {} }
+    if (error.name === 'NoSuchKey') return { ...DEFAULT_BOARD }
     throw error
   }
 }
@@ -359,6 +374,123 @@ export const saveBoard = async (board, userId = 'default') => {
 export const updateSaveStatus = async (name, status, userId = 'default') => {
   const board = await loadBoard(userId)
   board.statuses[name] = status
+  await appendTimelineEvent(userId, name, { type: 'status', status }, board)
+  return board
+}
+
+const EDIT_COLLAPSE_MS = 2 * 60 * 60 * 1000
+const MAX_TIMELINE_EVENTS = 80
+
+const cvObjectExists = async (name, userId = 'default') => {
+  try {
+    await getS3Client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: cvKey(name, userId) }))
+    return true
+  } catch (error) {
+    if (error.name !== 'NotFound' && error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) throw error
+    if (userId !== 'default') return false
+    try {
+      await getS3Client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: legacyCvKey(name) }))
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
+const appendTimelineEvent = async (userId, name, event, loadedBoard = null) => {
+  const board = loadedBoard || await loadBoard(userId)
+  const timeline = board.timeline || {}
+  const events = [...(timeline[name] || [])]
+  const at = event.at || new Date().toISOString()
+  const next = { ...event, at }
+
+  if (next.type === 'edited') {
+    const last = events[events.length - 1]
+    if (last?.type === 'edited' && new Date(at) - new Date(last.at) < EDIT_COLLAPSE_MS) {
+      last.at = at
+      timeline[name] = events
+      board.timeline = timeline
+      await saveBoard(board, userId)
+      return board
+    }
+  }
+
+  if (next.type === 'status') {
+    const lastStatus = [...events].reverse().find((item) => item.type === 'status')
+    if (lastStatus?.status === next.status) {
+      await saveBoard(board, userId)
+      return board
+    }
+  }
+
+  events.push(next)
+  timeline[name] = events.slice(-MAX_TIMELINE_EVENTS)
+  board.timeline = timeline
   await saveBoard(board, userId)
   return board
+}
+
+const toIso = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+export const getCvTimeline = async (name, userId = 'default') => {
+  const [board, versions] = await Promise.all([
+    loadBoard(userId).catch(() => ({ ...DEFAULT_BOARD })),
+    listVersions(name, userId).catch(() => []),
+  ])
+
+  let lastModified = null
+  try {
+    const head = await getS3Client().send(new HeadObjectCommand({
+      Bucket: BUCKET,
+      Key: cvKey(name, userId),
+    }))
+    lastModified = head.LastModified
+  } catch {
+    if (userId === 'default') {
+      try {
+        const head = await getS3Client().send(new HeadObjectCommand({
+          Bucket: BUCKET,
+          Key: legacyCvKey(name),
+        }))
+        lastModified = head.LastModified
+      } catch {
+        lastModified = null
+      }
+    }
+  }
+
+  const events = [...(board.timeline?.[name] || [])]
+  const oldestVersion = versions[versions.length - 1]
+  const createdAt = toIso(oldestVersion?.lastModified) || toIso(oldestVersion?.id) || toIso(lastModified)
+  if (createdAt && !events.some((event) => event.type === 'created')) {
+    events.push({ type: 'created', at: createdAt, inferred: true })
+  }
+
+  versions.forEach((version) => {
+    const at = toIso(version.lastModified) || toIso(version.id)
+    if (!at) return
+    if (oldestVersion && version.id === oldestVersion.id && createdAt) return
+    const alreadyRecorded = events.some((event) => (
+      event.type === 'version'
+      && (event.versionId === version.id || Math.abs(new Date(event.at) - new Date(at)) < 2000)
+    ))
+    if (!alreadyRecorded) {
+      events.push({ type: 'version', at, versionId: version.id, inferred: true })
+    }
+  })
+
+  const editedAt = toIso(lastModified)
+  if (editedAt && !events.some((event) => event.type === 'edited')) {
+    const createdEvent = events.find((event) => event.type === 'created')
+    if (!createdEvent || createdEvent.at !== editedAt) {
+      events.push({ type: 'edited', at: editedAt, inferred: true })
+    }
+  }
+
+  events.sort((a, b) => new Date(b.at) - new Date(a.at))
+  return { events, status: board.statuses?.[name] || 'draft' }
 }
