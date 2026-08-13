@@ -57,9 +57,13 @@ export const Experience = ({ experience, updateField }) => {
       updateField(`experience[${i}].dateDisplay`, editingValue)
     } else if (editingId.startsWith('company-')) {
       const i = parseInt(editingId.slice(8))
-      const parts = editingValue.split(', ')
-      updateField(`experience[${i}].company`, parts[0])
-      if (parts.length > 1) updateField(`experience[${i}].location`, parts.slice(1).join(', '))
+      const separator = editingValue.lastIndexOf(', ')
+      if (separator === -1) {
+        updateField(`experience[${i}].company`, editingValue)
+      } else {
+        updateField(`experience[${i}].company`, editingValue.slice(0, separator))
+        updateField(`experience[${i}].location`, editingValue.slice(separator + 2))
+      }
     } else if (editingId.startsWith('focus-')) {
       const i = parseInt(editingId.slice(6))
       updateField(`experience[${i}].focus`, editingValue)
@@ -81,7 +85,7 @@ export const Experience = ({ experience, updateField }) => {
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') setEditingId(null)
-    if (e.key === 'Enter' && !e.shiftKey && !editingId?.startsWith('focus-')) {
+    if (e.key === 'Enter' && !e.shiftKey && !editingId?.startsWith('focus-') && !editingId?.startsWith('company-')) {
       e.preventDefault()
       commitEdit()
     }
@@ -161,9 +165,9 @@ export const Experience = ({ experience, updateField }) => {
                     </div>
 
                     {/* Company / location */}
-                    <div className="cv-configurable-text cv-text-base text-[10.5pt] text-text-light leading-none">
+                    <div className="cv-configurable-text cv-text-base text-[10.5pt] text-text-light leading-snug whitespace-pre-wrap">
                       {editingId === companyId ? (
-                        <input {...editProps} className={`${inlineEditClass} w-full`} />
+                        <textarea {...editProps} className={blockEditClass} rows={1} />
                       ) : (
                         <DisplaySpan id={companyId} value={companyDisplay} placeholder="Company, Location" />
                       )}
