@@ -73,7 +73,7 @@ export const cvToMarkdown = (cv = {}) => {
 
   const knownKeys = new Set([
     'meta', 'presentation', 'basics', 'summary', 'skills', 'experience', 'education', 'languages',
-    'certificationsAndAffiliations', 'sectionsOrder', 'notes',
+    'certificationsAndAffiliations', 'sectionsOrder', 'notes', 'clonedFrom',
   ])
   Object.entries(cv).forEach(([key, value]) => {
     if (knownKeys.has(key) || !value || typeof value !== 'object' || Array.isArray(value)) return

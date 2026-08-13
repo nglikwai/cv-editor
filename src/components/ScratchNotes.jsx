@@ -39,7 +39,7 @@ const formatTimelineDate = (date) =>
   })
 
 const eventLabel = (event) => {
-  if (event.type === 'created') return 'Created'
+  if (event.type === 'created') return event.clonedFrom ? 'Cloned' : 'Created'
   if (event.type === 'edited') return 'Edited'
   if (event.type === 'version') return 'New version'
   if (event.type === 'status') return STATUS_LABELS[event.status] || event.status
@@ -51,6 +51,22 @@ const eventColor = (event) => {
   if (event.type === 'edited') return '#64748b'
   if (event.type === 'version') return '#d4a039'
   return STATUS_COLORS[event.status] || '#64748b'
+}
+
+const CloneSourceLink = ({ name, onOpenCv }) => {
+  if (!name) return null
+  if (!onOpenCv) return <span>{name}</span>
+  return (
+    <button
+      type="button"
+      data-scratch-no-drag
+      onClick={() => onOpenCv(name)}
+      className="text-deep-blue font-medium hover:underline underline-offset-2 truncate max-w-full"
+      title={`Open ${name} in editor`}
+    >
+      {name}
+    </button>
+  )
 }
 
 const defaultPosition = () => ({ left: 16, top: 96 })
@@ -84,7 +100,7 @@ const clampPosition = (left, top, width, height) => {
   }
 }
 
-export const ScratchNotes = ({ value, onChange, cvName, userId = 'default', refreshKey }) => {
+export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId = 'default', refreshKey, onOpenCv }) => {
   const [open, setOpen] = useState(false)
   const [events, setEvents] = useState([])
   const [position, setPosition] = useState({ left: 16, top: 96 })
@@ -225,7 +241,13 @@ export const ScratchNotes = ({ value, onChange, cvName, userId = 'default', refr
       <div className="border-t border-white/20 px-3 py-2.5 overflow-y-auto min-h-0">
         <p className="text-[10px] uppercase tracking-wider font-semibold text-text-light mb-2">Timeline</p>
         {!cvName ? (
-          <p className="text-[11px] text-text-light">Save this CV to start a timeline.</p>
+          clonedFrom ? (
+            <p className="text-[11px] text-text-light">
+              Cloned from <CloneSourceLink name={clonedFrom} onOpenCv={onOpenCv} />. Save this CV to start a timeline.
+            </p>
+          ) : (
+            <p className="text-[11px] text-text-light">Save this CV to start a timeline.</p>
+          )
         ) : events.length === 0 ? (
           <p className="text-[11px] text-text-light">No activity recorded yet.</p>
         ) : (
@@ -243,6 +265,12 @@ export const ScratchNotes = ({ value, onChange, cvName, userId = 'default', refr
                 </span>
                 <div className="min-w-0 pb-0.5">
                   <p className="text-xs font-semibold text-text-dark leading-none">{eventLabel(event)}</p>
+                  {event.clonedFrom && (
+                    <p className="text-[11px] text-text-dark/80 mt-1 flex items-baseline gap-1 min-w-0">
+                      <span className="shrink-0">from</span>
+                      <CloneSourceLink name={event.clonedFrom} onOpenCv={onOpenCv} />
+                    </p>
+                  )}
                   <p className="text-[10px] text-text-light mt-1 leading-none">{formatTimelineDate(event.at)}</p>
                 </div>
               </li>

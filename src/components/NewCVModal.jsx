@@ -66,7 +66,7 @@ export const NewCVModal = ({ isOpen, boardTag, saves, onCancel, onConfirm }) => 
             >
               <FiCopy size={18} className={mode === 'clone' ? 'text-deep-blue' : 'text-text-light'} />
               <span className="block text-sm font-semibold text-text-dark mt-2">Clone a CV</span>
-              <span className="block text-[11px] text-text-light mt-0.5">Copy an existing CV</span>
+              <span className="block text-[11px] text-text-light mt-0.5">Copy an existing CV and its template</span>
             </button>
             <button
               type="button"

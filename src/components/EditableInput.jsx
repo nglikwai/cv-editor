@@ -1,6 +1,6 @@
 import React, { useRef, useLayoutEffect } from 'react'
 
-export const EditableInput = ({ value, onChange, className = '', placeholder = '' }) => {
+export const EditableInput = ({ value, onChange, className = '', placeholder = '', autoFocus = false, onBlur }) => {
   return (
     <input
       type="text"
@@ -8,6 +8,8 @@ export const EditableInput = ({ value, onChange, className = '', placeholder = '
       style={{ fieldSizing: 'content' }}
       value={value || ''}
       placeholder={placeholder}
+      autoFocus={autoFocus}
+      onBlur={onBlur}
       onChange={(e) => onChange(e.target.value)}
     />
   )

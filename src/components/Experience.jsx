@@ -26,8 +26,6 @@ const HighlightDisplay = ({ highlight }) => {
   )
 }
 
-const MULTILINE_IDS = (id) => id.startsWith('focus-') || /^\d+-\d+$/.test(id)
-
 export const Experience = ({ experience, updateField }) => {
   const [editingId, setEditingId] = useState(null)
   const [editingValue, setEditingValue] = useState('')
@@ -83,7 +81,10 @@ export const Experience = ({ experience, updateField }) => {
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') setEditingId(null)
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit() }
+    if (e.key === 'Enter' && !e.shiftKey && !editingId?.startsWith('focus-')) {
+      e.preventDefault()
+      commitEdit()
+    }
   }
 
   const editProps = {
@@ -169,7 +170,7 @@ export const Experience = ({ experience, updateField }) => {
                     </div>
 
                     {/* Focus */}
-                    <div className={`cv-experience-focus cv-configurable-text cv-text-small text-[9.75pt] text-text-light italic leading-snug ${!exp.focus && editingId !== focusId ? 'print:hidden' : ''}`}>
+                    <div className={`cv-experience-focus cv-configurable-text cv-text-small text-[9.75pt] text-text-light italic leading-snug whitespace-pre-wrap ${!exp.focus && editingId !== focusId ? 'print:hidden' : ''}`}>
                         {editingId === focusId ? (
                           <textarea {...editProps} className={blockEditClass} rows={1} />
                         ) : (

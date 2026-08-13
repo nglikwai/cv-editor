@@ -289,7 +289,10 @@ export const saveToS3 = async (data, name, tags = [], createVersion = true, user
   }
   await saveTags(allTags, userId)
   if (!existed) {
-    await appendTimelineEvent(userId, name, { type: 'created' })
+    const clonedFrom = typeof data.clonedFrom === 'string' && data.clonedFrom.trim()
+      ? data.clonedFrom.trim()
+      : undefined
+    await appendTimelineEvent(userId, name, clonedFrom ? { type: 'created', clonedFrom } : { type: 'created' })
   } else if (createVersion) {
     await appendTimelineEvent(userId, name, { type: 'version', versionId })
   } else {
@@ -437,9 +440,10 @@ const toIso = (value) => {
 }
 
 export const getCvTimeline = async (name, userId = 'default') => {
-  const [board, versions] = await Promise.all([
+  const [board, versions, cvData] = await Promise.all([
     loadBoard(userId).catch(() => ({ ...DEFAULT_BOARD })),
     listVersions(name, userId).catch(() => []),
+    loadFromS3(name, userId).catch(() => null),
   ])
 
   let lastModified = null
@@ -464,10 +468,16 @@ export const getCvTimeline = async (name, userId = 'default') => {
   }
 
   const events = [...(board.timeline?.[name] || [])]
+  const clonedFrom = typeof cvData?.clonedFrom === 'string' && cvData.clonedFrom.trim()
+    ? cvData.clonedFrom.trim()
+    : undefined
   const oldestVersion = versions[versions.length - 1]
   const createdAt = toIso(oldestVersion?.lastModified) || toIso(oldestVersion?.id) || toIso(lastModified)
   if (createdAt && !events.some((event) => event.type === 'created')) {
-    events.push({ type: 'created', at: createdAt, inferred: true })
+    events.push({ type: 'created', at: createdAt, clonedFrom, inferred: true })
+  } else if (clonedFrom) {
+    const createdEvent = events.find((event) => event.type === 'created')
+    if (createdEvent && !createdEvent.clonedFrom) createdEvent.clonedFrom = clonedFrom
   }
 
   versions.forEach((version) => {

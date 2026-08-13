@@ -85,6 +85,43 @@ const editorPath = (name, version = null) => {
   return version ? `${path}?version=${encodeURIComponent(version)}` : path
 }
 
+const resolveTemplateId = (templateId) => {
+  const normalized = templateId === 'simple' ? 'classic' : (templateId || 'modern')
+  return CV_TEMPLATES.some((template) => template.id === normalized) ? normalized : 'classic'
+}
+
+const cloneCvPresentation = (sourceData, globalSettings = DEFAULT_SETTINGS) => {
+  const presentation = sourceData.presentation || {}
+  const requestedTemplateId = presentation.templateId || 'modern'
+  const templateId = resolveTemplateId(requestedTemplateId)
+  const templateSettings = presentation.templateSettings || {}
+  const layout = {
+    ...getTemplateLayoutDefaults(templateId),
+    ...(Object.keys(templateSettings).length === 0 ? presentation.layout || {} : {}),
+    ...(requestedTemplateId === 'simple' ? templateSettings.simple?.layout || {} : {}),
+    ...(templateSettings[templateId]?.layout || {}),
+  }
+  const nextTemplateSettings = {
+    ...templateSettings,
+    [templateId]: {
+      ...(templateSettings[templateId] || {}),
+      layout,
+    },
+  }
+  const nextPresentation = {
+    ...presentation,
+    templateId,
+    themeColors: {
+      ...DEFAULT_SETTINGS.themeColors,
+      ...(globalSettings.themeColors || {}),
+      ...(presentation.themeColors || {}),
+    },
+    templateSettings: nextTemplateSettings,
+  }
+  delete nextPresentation.layout
+  return nextPresentation
+}
+
 function App() {
   const { users, activeUser, switchUser, addUser, hydrated: workspaceHydrated } = useWorkspaceUser()
   const { cvData, updateField, loadData } = useCVData(initialData)
@@ -215,6 +252,14 @@ function App() {
       resizeObserver.disconnect()
     }
   }, [printPreview, boardOpen, routeLoading, cvData, effectiveEditorSettings])
+
+  useEffect(() => {
+    if (boardOpen) {
+      document.title = 'CV Workspace'
+      return
+    }
+    document.title = `${currentSaveName || 'Unsaved CV'} - CV`
+  }, [boardOpen, currentSaveName])
 
   useEffect(() => {
     if (!printPreview) previewPositionedRef.current = false
@@ -457,8 +502,16 @@ function App() {
         return false
       }
 
-      loadData(sourceData)
-      autoSaveBaselineRef.current = { name: null, snapshot: JSON.stringify(sourceData) }
+      const nextData = JSON.parse(JSON.stringify(sourceData))
+      if (sourceSave?.name) {
+        nextData.clonedFrom = sourceSave.name
+        nextData.presentation = cloneCvPresentation(sourceData, settings)
+      } else {
+        delete nextData.clonedFrom
+      }
+
+      loadData(nextData)
+      autoSaveBaselineRef.current = { name: null, snapshot: JSON.stringify(nextData) }
       setCurrentSaveName(null)
       setCurrentSaveTags(sourceSave?.tags || (boardTag ? [boardTag] : []))
       setCurrentVersionId(null)
@@ -549,6 +602,8 @@ function App() {
         setCurrentVersionId(null)
         navigateToEditor(name)
         showSnackbar(`Loaded "${name}"`)
+      } else {
+        showSnackbar(`CV "${name}" was not found`, 'error')
       }
     } catch (err) {
       console.error('Error loading version:', err)
@@ -728,8 +783,12 @@ function App() {
             value={cvData.notes}
             onChange={(notes) => updateField('notes', notes)}
             cvName={currentSaveName}
+            clonedFrom={typeof cvData.clonedFrom === 'string' ? cvData.clonedFrom : ''}
             userId={activeUser.id}
             refreshKey={`${saving ? 1 : 0}:${autoSaving ? 1 : 0}`}
+            onOpenCv={(name) => {
+              if (name && name !== currentSaveName) handleOpenCV(name)
+            }}
           />
           <Toolbar
             onSave={handleSave}

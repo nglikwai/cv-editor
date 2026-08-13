@@ -10,7 +10,7 @@ import { Languages } from './Languages'
 const KNOWN_KEYS = new Set([
   'meta', 'presentation', 'basics', 'summary', 'skills', 'experience',
   'education', 'languages', 'certificationsAndAffiliations',
-  'sectionsOrder', 'notes',
+  'sectionsOrder', 'notes', 'clonedFrom',
 ])
 
 export const CV_TEMPLATES = [

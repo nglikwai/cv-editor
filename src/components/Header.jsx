@@ -1,4 +1,61 @@
+import { useState } from 'react'
 import { EditableInput, EditableTextarea } from './EditableInput'
+
+const parseEmailValue = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return { label: '', href: '' }
+
+  const markdown = raw.match(/^\[([^\]]+)\]\(\s*(mailto:[^)\s]+|[^)\s]+@[^)\s]+)\s*\)$/i)
+  if (markdown) {
+    const address = markdown[2].trim().replace(/^mailto:/i, '')
+    return { label: markdown[1].trim() || address, href: `mailto:${address}` }
+  }
+
+  const mailto = raw.match(/^mailto:(.+)$/i)
+  if (mailto) {
+    const address = mailto[1].trim()
+    return { label: address, href: `mailto:${address}` }
+  }
+
+  if (raw.includes('@') && !/\s/.test(raw)) {
+    return { label: raw, href: `mailto:${raw}` }
+  }
+
+  return { label: raw, href: '' }
+}
+
+const EmailField = ({ value, onChange, className = '' }) => {
+  const [editing, setEditing] = useState(false)
+  const parsed = parseEmailValue(value)
+
+  if (!editing && parsed.href) {
+    return (
+      <a
+        href={parsed.href}
+        className={`${className} underline decoration-golden-yellow/70 underline-offset-2 hover:text-white`}
+        title={`${parsed.label} · click to edit, ⌘/Ctrl-click to email`}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey) return
+          event.preventDefault()
+          setEditing(true)
+        }}
+      >
+        {parsed.label}
+      </a>
+    )
+  }
+
+  return (
+    <EditableInput
+      value={value}
+      onChange={onChange}
+      placeholder="email or [name](mailto:you@domain.com)"
+      className={className}
+      autoFocus={editing}
+      onBlur={() => setEditing(false)}
+    />
+  )
+}
 
 export const Header = ({ basics, updateField, multilineHeadline = false }) => {
   if (!basics) return null
@@ -67,7 +124,7 @@ export const Header = ({ basics, updateField, multilineHeadline = false }) => {
               d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
             />
           </svg>
-          <EditableInput
+          <EmailField
             value={contacts?.email}
             onChange={(v) => updateField('basics.contacts.email', v)}
             className="cv-configurable-text cv-text-base w-auto min-w-20 text-sm text-slate-200"
