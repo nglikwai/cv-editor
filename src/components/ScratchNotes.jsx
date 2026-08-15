@@ -100,12 +100,40 @@ const clampPosition = (left, top, width, height) => {
   }
 }
 
-export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId = 'default', refreshKey, onOpenCv }) => {
-  const [open, setOpen] = useState(false)
+const MAX_NOTE_ROWS = 15
+
+const sizeNotesTextarea = (textarea) => {
+  if (!textarea) return
+  const styles = getComputedStyle(textarea)
+  const lineHeight = Number.parseFloat(styles.lineHeight) || 22
+  const padding = (Number.parseFloat(styles.paddingTop) || 0) + (Number.parseFloat(styles.paddingBottom) || 0)
+  const minHeight = padding + lineHeight
+  const maxHeight = padding + lineHeight * MAX_NOTE_ROWS
+  textarea.style.height = '1px'
+  const contentHeight = textarea.scrollHeight
+  textarea.style.height = `${Math.min(Math.max(contentHeight, minHeight), maxHeight)}px`
+  textarea.style.overflowY = contentHeight > maxHeight + 1 ? 'auto' : 'hidden'
+}
+
+export const ScratchNotes = ({
+  value,
+  onChange,
+  cvName,
+  clonedFrom = '',
+  userId = 'default',
+  refreshKey,
+  onOpenCv,
+  open: openProp,
+  onOpenChange,
+}) => {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = openProp ?? uncontrolledOpen
+  const setOpen = onOpenChange ?? setUncontrolledOpen
   const [events, setEvents] = useState([])
   const [position, setPosition] = useState({ left: 16, top: 96 })
   const [dragging, setDragging] = useState(false)
   const panelRef = useRef(null)
+  const notesRef = useRef(null)
   const dragRef = useRef(null)
   const positionRef = useRef(position)
   const text = typeof value === 'string' ? value : ''
@@ -119,6 +147,11 @@ export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId 
   }, [userId])
 
   useLayoutEffect(() => {
+    if (!open) return
+    sizeNotesTextarea(notesRef.current)
+  }, [open, text])
+
+  useLayoutEffect(() => {
     const panel = panelRef.current
     if (!panel) return undefined
 
@@ -129,7 +162,7 @@ export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId 
     keepOnScreen()
     window.addEventListener('resize', keepOnScreen)
     return () => window.removeEventListener('resize', keepOnScreen)
-  }, [open])
+  }, [open, text])
 
   useEffect(() => {
     if (!open || !cvName) {
@@ -193,7 +226,7 @@ export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="scratch-notes scratch-notes-toggle fixed top-1/2 left-4 -translate-y-1/2 z-[1000] print:hidden flex flex-col items-center gap-1.5 px-2.5 py-3 rounded-full border bg-white/10 backdrop-blur-md border-white/20 shadow-[0_4px_24px_rgba(0,0,0,0.15)] text-black/70 hover:text-black transition-colors"
+        className="scratch-notes scratch-notes-toggle hidden md:flex fixed top-1/2 left-4 -translate-y-1/2 z-[1000] print:hidden flex-col items-center gap-1.5 px-2.5 py-3 rounded-full border bg-white/10 backdrop-blur-md border-white/20 shadow-[0_4px_24px_rgba(0,0,0,0.15)] text-black/70 hover:text-black transition-colors"
         aria-label="Open scratch notes"
         title="Scratch notes"
       >
@@ -206,7 +239,7 @@ export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId 
     <aside
       ref={panelRef}
       style={panelStyle}
-      className="scratch-notes fixed z-[1000] print:hidden w-72 max-h-[min(36rem,calc(100vh-8rem))] flex flex-col rounded-2xl border bg-white/10 backdrop-blur-md border-white/20 shadow-[0_4px_24px_rgba(0,0,0,0.15)] overflow-hidden"
+      className="scratch-notes fixed z-[1000] print:hidden w-72 max-h-[min(36rem,calc(100vh-8rem))] flex flex-col rounded-2xl border bg-white/10 backdrop-blur-md border-white/20 shadow-[0_4px_24px_rgba(0,0,0,0.15)] overflow-hidden max-md:!left-3 max-md:!right-3 max-md:!top-auto max-md:!bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-md:!w-auto max-md:max-h-[min(70dvh,calc(100dvh-9rem))]"
     >
       <div
         onPointerDown={startDrag}
@@ -232,10 +265,12 @@ export const ScratchNotes = ({ value, onChange, cvName, clonedFrom = '', userId 
         </button>
       </div>
       <textarea
+        ref={notesRef}
+        rows={1}
         value={text}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Company site, job posting, interview notes…"
-        className="min-h-28 w-full resize-none bg-transparent px-3 py-2.5 text-sm text-text-dark leading-relaxed placeholder:text-text-light/70 focus:outline-none"
+        className="w-full resize-none bg-transparent px-3 py-2.5 text-sm text-text-dark leading-relaxed placeholder:text-text-light/70 focus:outline-none"
         spellCheck="true"
       />
       <div className="border-t border-white/20 px-3 py-2.5 overflow-y-auto min-h-0">

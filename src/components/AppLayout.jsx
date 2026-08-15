@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FiCheck, FiChevronDown, FiColumns, FiEdit3, FiLayout, FiMoon, FiPlus, FiSun, FiUser } from 'react-icons/fi'
+import { PwaRegister } from './PwaRegister'
 
 const NavButton = ({ active, icon, label, onClick }) => (
   <button
@@ -36,11 +37,12 @@ export const AppLayout = ({
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   return (
-  <div className={`app-shell ${darkMode ? 'dark-ui' : ''} min-h-screen h-screen flex flex-col bg-[var(--app-canvas)] text-text-dark print:h-auto print:min-h-0 print:block print:bg-white`}>
-    <header className="h-16 shrink-0 bg-white border-b border-border-light shadow-sm z-[1200] print:hidden">
-      <div className="h-full px-3 sm:px-5 flex items-center gap-3 sm:gap-6">
+  <div className={`app-shell ${darkMode ? 'dark-ui' : ''} min-h-[100dvh] h-[100dvh] flex flex-col bg-[var(--app-canvas)] text-text-dark print:h-auto print:min-h-0 print:block print:bg-white`}>
+    <PwaRegister />
+    <header className="shrink-0 bg-white border-b border-border-light shadow-sm z-[1200] print:hidden pt-[env(safe-area-inset-top,0px)]">
+      <div className="h-14 md:h-16 px-2 sm:px-5 flex items-center gap-2 sm:gap-6">
         <div className="flex items-center gap-2.5 shrink-0">
-          <span className="w-9 h-9 rounded-xl bg-deep-blue text-white flex items-center justify-center shadow-sm overflow-hidden">
+          <span className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-deep-blue text-white flex items-center justify-center shadow-sm overflow-hidden">
             <svg viewBox="0 0 32 32" className="w-full h-full" aria-hidden="true">
               <rect width="32" height="32" rx="8" fill="#1a365d" />
               <path
@@ -74,7 +76,7 @@ export const AppLayout = ({
         <div className="flex-1" />
 
         {activePage === 'editor' && templates.length > 0 && (
-          <label className="h-9 flex items-center gap-2 px-2.5 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
+          <label className="h-9 hidden sm:flex items-center gap-2 px-2.5 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
             <FiLayout size={15} />
             <span className="hidden lg:inline text-[10px] uppercase tracking-wider font-semibold">Template</span>
             <select
@@ -102,7 +104,7 @@ export const AppLayout = ({
         </button>
 
         {activeUser && (
-          <div className="relative h-9 flex items-center gap-1.5 px-2.5 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
+          <div className="relative h-9 flex items-center gap-1.5 px-2 sm:px-2.5 rounded-lg border border-border-light bg-bg-light text-text-light shrink-0">
             <FiUser size={15} />
             <button
               type="button"
@@ -111,7 +113,7 @@ export const AppLayout = ({
               aria-label="Workspace user"
               aria-expanded={userMenuOpen}
             >
-              <span className="truncate">{activeUser.name}</span>
+              <span className="truncate hidden sm:inline">{activeUser.name}</span>
               <FiChevronDown size={13} className={`shrink-0 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             {userMenuOpen && (
@@ -155,7 +157,7 @@ export const AppLayout = ({
       </div>
     </header>
 
-    <main className={`flex-1 min-h-0 print:overflow-visible ${activePage === 'board' ? 'overflow-hidden' : 'overflow-auto'}`}>
+    <main className={`flex-1 min-h-0 print:overflow-visible ${activePage === 'board' ? 'overflow-hidden' : 'overflow-auto'} ${activePage === 'editor' ? 'max-md:pb-[4.75rem]' : ''}`}>
       {children}
     </main>
   </div>

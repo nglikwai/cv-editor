@@ -257,7 +257,7 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
 
   return (
     <div className={`fixed inset-0 z-[2000] pointer-events-none print:hidden ${visible ? '' : 'hidden'}`}>
-      <aside className="left-settings-drawer pointer-events-auto absolute top-16 bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-[420px] max-w-[calc(100vw-1rem)] flex flex-col overflow-hidden">
+      <aside className="left-settings-drawer pointer-events-auto absolute top-[calc(3.5rem+env(safe-area-inset-top,0px))] md:top-16 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-full md:w-[420px] max-w-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
           <div>

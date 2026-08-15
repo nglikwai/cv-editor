@@ -159,7 +159,7 @@ const BoardColumn = ({
   return (
     <div
       data-column-id={column.id}
-      className={`snap-start [scroll-snap-stop:always] flex flex-col min-w-[260px] w-[260px] max-h-full rounded-xl transition-colors ${
+      className={`snap-start [scroll-snap-stop:always] flex flex-col min-w-[min(16.25rem,calc(100vw-2rem))] w-[min(16.25rem,calc(100vw-2rem))] max-h-full rounded-xl transition-colors ${
         dragOver ? 'bg-deep-blue/5 ring-2 ring-deep-blue/20' : 'bg-bg-light/80'
       }`}
       onDragOver={(e) => onDragOver(e, column.id)}
@@ -255,7 +255,7 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className={`group flex items-center gap-2.5 w-44 sm:w-52 px-3 py-2 rounded-xl border bg-white text-left transition-all ${
+        className={`group flex items-center gap-2.5 w-40 sm:w-52 px-3 py-2 rounded-xl border bg-white text-left transition-all ${
           open
             ? 'border-deep-blue/50 ring-4 ring-deep-blue/10 shadow-md'
             : 'border-border-light shadow-sm hover:border-deep-blue/30 hover:shadow-md'
@@ -599,7 +599,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter by name or tag…"
-          className="hidden lg:block w-44 xl:w-56 text-sm border border-border-light rounded-lg px-3 py-1.5 text-text-dark focus:outline-none focus:ring-2 focus:ring-deep-blue/20 bg-bg-light/50"
+          className="w-full order-last basis-full lg:order-none lg:basis-auto lg:w-44 xl:w-56 text-sm border border-border-light rounded-lg px-3 py-1.5 text-text-dark focus:outline-none focus:ring-2 focus:ring-deep-blue/20 bg-bg-light/50"
         />
 
         <button
@@ -613,7 +613,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
       </header>
 
       {/* Body */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-hidden p-3 sm:p-4">
         {loading ? (
           <div className="h-full flex items-center justify-center text-sm text-text-light">
             Loading board…
@@ -700,7 +700,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
       </div>
 
       {/* Footer hint */}
-      <footer className="px-5 py-2 border-t border-border-light bg-white/80 text-[11px] text-text-light flex items-center gap-4 shrink-0">
+      <footer className="hidden sm:flex px-5 py-2 border-t border-border-light bg-white/80 text-[11px] text-text-light items-center gap-4 shrink-0">
         <span>Click a card to open in editor · Drag between columns to update status</span>
       </footer>
     </div>

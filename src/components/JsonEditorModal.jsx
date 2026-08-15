@@ -74,7 +74,7 @@ export const JsonEditorModal = ({ isOpen, visible = true, onClose, cvData, onCon
 
   return (
     <div className={`fixed inset-0 z-[2000] pointer-events-none print:hidden ${visible ? '' : 'hidden'}`}>
-      <aside className="left-settings-drawer pointer-events-auto absolute top-16 bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-[640px] max-w-[calc(100vw-1rem)] flex flex-col overflow-hidden">
+      <aside className="left-settings-drawer pointer-events-auto absolute top-[calc(3.5rem+env(safe-area-inset-top,0px))] md:top-16 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-full md:w-[640px] max-w-full flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-semibold text-deep-blue">CV Data</h2>

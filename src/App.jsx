@@ -128,6 +128,7 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [saveNameOpen, setSaveNameOpen] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
   const [boardOpen, setBoardOpen] = useState(true)
@@ -233,7 +234,7 @@ function App() {
       previewStage.style.setProperty('--preview-stage-height', `${pageHeight}px`)
       // Keep the first page 30% from the editor viewport's left edge on
       // initial load. The viewport remains freely horizontally scrollable.
-      const previewLeftGutter = viewportWidth * 0.3
+      const previewLeftGutter = viewportWidth < 768 ? 12 : viewportWidth * 0.3
       previewStage.style.setProperty('--preview-side-gutter', `${previewLeftGutter}px`)
 
       if (!previewPositionedRef.current) {
@@ -718,6 +719,7 @@ function App() {
       return
     }
     if (settingsOpen) handleCloseSettings()
+    setNotesOpen(false)
     setJsonEditorOpen(true)
   }
 
@@ -727,6 +729,7 @@ function App() {
       return
     }
     setJsonEditorOpen(false)
+    setNotesOpen(false)
     setSettingsOpen(true)
   }
 
@@ -786,6 +789,8 @@ function App() {
             clonedFrom={typeof cvData.clonedFrom === 'string' ? cvData.clonedFrom : ''}
             userId={activeUser.id}
             refreshKey={`${saving ? 1 : 0}:${autoSaving ? 1 : 0}`}
+            open={notesOpen}
+            onOpenChange={setNotesOpen}
             onOpenCv={(name) => {
               if (name && name !== currentSaveName) handleOpenCV(name)
             }}
@@ -807,6 +812,12 @@ function App() {
             autoSaving={autoSaving}
             autoSaveDisabled={!currentSaveName || !!currentVersionId}
             onToggleAutoSave={() => setAutoSave((current) => !current)}
+            notesOpen={notesOpen}
+            onToggleNotes={() => {
+              setNotesOpen((open) => !open)
+              setJsonEditorOpen(false)
+              if (settingsOpen) handleCloseSettings()
+            }}
           />
           <SaveNameModal
             isOpen={saveNameOpen}
