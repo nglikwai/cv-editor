@@ -117,15 +117,12 @@ body.dark-ui-body {
 }
 
 .cv-container .cv-section {
-  padding-top: var(--cv-section-spacing, 16px);
-  padding-bottom: var(--cv-section-spacing, 16px);
+  padding-top: var(--cv-section-margin-top, var(--cv-section-spacing, 16px));
+  padding-bottom: var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px));
 }
 
-/* Keep the section control meaningful at the boundaries between every
-   adjacent CV section, including Experience → Skills → Certifications →
-   Education → Languages. */
 .cv-container .cv-section + .cv-section {
-  margin-top: var(--cv-section-spacing, 16px);
+  margin-top: var(--cv-section-gap, 0px);
 }
 
 .cv-container .experience-item {
@@ -251,8 +248,8 @@ body.dark-ui-body {
 }
 
 .cv-template-modern .cv-summary {
-  padding-top: var(--cv-section-spacing, 14px);
-  padding-bottom: calc(var(--cv-section-spacing, 14px) + 6px);
+  padding-top: var(--cv-section-summary-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 14px)));
+  padding-bottom: var(--cv-section-summary-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 14px)));
 }
 
 .cv-template-modern .cv-summary .cv-text-base {
@@ -260,8 +257,8 @@ body.dark-ui-body {
 }
 
 .cv-template-modern .cv-experience {
-  padding-top: 8px;
-  padding-bottom: 0;
+  padding-top: var(--cv-section-experience-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 14px)));
+  padding-bottom: var(--cv-section-experience-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 14px)));
 }
 
 .cv-template-modern .experience-content {
@@ -271,9 +268,10 @@ body.dark-ui-body {
   background-color: transparent;
 }
 
-.cv-template-modern .cv-tools {
-  padding-top: 0;
-  padding-bottom: 2px;
+.cv-template-modern .cv-tools,
+.cv-template-modern .cv-skills {
+  padding-top: var(--cv-section-skills-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 14px)));
+  padding-bottom: var(--cv-section-skills-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 14px)));
 }
 
 .cv-template-modern .cv-tools > h2,
@@ -288,13 +286,13 @@ body.dark-ui-body {
 }
 
 .cv-template-modern .cv-certifications {
-  padding-top: 8px;
-  padding-bottom: 4px;
+  padding-top: var(--cv-section-certifications-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 14px)));
+  padding-bottom: var(--cv-section-certifications-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 14px)));
 }
 
 .cv-template-modern .cv-education {
-  padding-top: 0;
-  padding-bottom: 4px;
+  padding-top: var(--cv-section-education-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 14px)));
+  padding-bottom: var(--cv-section-education-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 14px)));
 }
 
 .cv-template-modern .cv-education > h2 {
@@ -302,8 +300,8 @@ body.dark-ui-body {
 }
 
 .cv-template-modern .cv-languages {
-  padding-top: 2px;
-  padding-bottom: 8px;
+  padding-top: var(--cv-section-languages-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 14px)));
+  padding-bottom: var(--cv-section-languages-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 14px)));
 }
 
 .cv-template-modern .cv-section > h2 {
@@ -336,7 +334,7 @@ body.dark-ui-body {
 }
 
 .cv-template-classic .classic-hero {
-  margin-bottom: 24px;
+  margin-bottom: calc(24px + var(--cv-section-gap, 0px));
   background-color: #f1f5f9;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.1);
 }
@@ -392,7 +390,10 @@ body.dark-ui-body {
 }
 
 .cv-template-classic .classic-hero .cv-summary {
-  padding: 16px 48px calc(var(--cv-header-padding-y, 24px) * 0.75);
+  padding-top: var(--cv-section-summary-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-right: 48px;
+  padding-bottom: var(--cv-section-summary-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+  padding-left: 48px;
 }
 
 .cv-template-classic .classic-hero .cv-summary > div {
@@ -504,17 +505,8 @@ body.dark-ui-body {
   background-color: transparent;
 }
 
-.cv-template-classic .cv-tools {
-  margin-top: 16px;
-}
-
 .cv-template-classic .cv-tools .w-36 {
   width: 112px;
-}
-
-.cv-template-classic .cv-certifications,
-.cv-template-classic .cv-education {
-  margin-top: 16px;
 }
 
 .cv-template-classic .cv-education .space-y-2 {
@@ -557,21 +549,51 @@ body.dark-ui-body {
   page-break-inside: auto;
 }
 
-/* Section spacing is applied only between sections. Remove the legacy
-   per-section vertical padding and template-specific top offsets so the
-   configured value is predictable everywhere. */
+/* Section spacing uses independent top and bottom padding so both
+   controls are predictable and do not collapse between sections. */
 .cv-container .cv-section {
-  padding-top: 0;
-  padding-bottom: 0;
+  padding-top: var(--cv-section-margin-top, var(--cv-section-spacing, 16px));
+  padding-bottom: var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px));
   margin-top: 0;
 }
 
+.cv-container .cv-summary {
+  padding-top: var(--cv-section-summary-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-bottom: var(--cv-section-summary-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+}
+
+.cv-container .cv-experience {
+  padding-top: var(--cv-section-experience-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-bottom: var(--cv-section-experience-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+}
+
+.cv-container .cv-tools,
+.cv-container .cv-skills {
+  padding-top: var(--cv-section-skills-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-bottom: var(--cv-section-skills-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+}
+
+.cv-container .cv-certifications {
+  padding-top: var(--cv-section-certifications-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-bottom: var(--cv-section-certifications-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+}
+
+.cv-container .cv-education {
+  padding-top: var(--cv-section-education-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-bottom: var(--cv-section-education-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+}
+
+.cv-container .cv-languages {
+  padding-top: var(--cv-section-languages-margin-top, var(--cv-section-margin-top, var(--cv-section-spacing, 16px)));
+  padding-bottom: var(--cv-section-languages-margin-bottom, var(--cv-section-margin-bottom, var(--cv-section-spacing, 16px)));
+}
+
 .cv-container .cv-section + .cv-section {
-  margin-top: var(--cv-section-spacing, 16px);
+  margin-top: var(--cv-section-gap, 0px);
 }
 
 .cv-container .cv-header + .cv-section {
-  margin-top: var(--cv-section-spacing, 16px);
+  margin-top: 0;
 }
 
 .dark-ui {

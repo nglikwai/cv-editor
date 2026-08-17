@@ -161,16 +161,24 @@ function App() {
     ...settings.themeColors,
     ...(cvData.presentation?.themeColors || {}),
   }), [settings.themeColors, cvData.presentation?.themeColors])
-  const effectiveTemplateLayout = useMemo(() => ({
-    ...getTemplateLayoutDefaults(activeTemplateId),
-    ...(Object.keys(cvData.presentation?.templateSettings || {}).length === 0
-      ? cvData.presentation?.layout || {}
-      : {}),
-    ...(requestedTemplateId === 'simple'
-      ? cvData.presentation?.templateSettings?.simple?.layout || {}
-      : {}),
-    ...(cvData.presentation?.templateSettings?.[activeTemplateId]?.layout || {}),
-  }), [
+  const effectiveTemplateLayout = useMemo(() => {
+    const cvLayout = {
+      ...(Object.keys(cvData.presentation?.templateSettings || {}).length === 0
+        ? cvData.presentation?.layout || {}
+        : {}),
+      ...(requestedTemplateId === 'simple'
+        ? cvData.presentation?.templateSettings?.simple?.layout || {}
+        : {}),
+      ...(cvData.presentation?.templateSettings?.[activeTemplateId]?.layout || {}),
+    }
+    return normalizeSettings({
+      templateLayout: {
+        ...getTemplateLayoutDefaults(activeTemplateId),
+        ...cvLayout,
+        sectionMargins: cvLayout.sectionMargins,
+      },
+    }, activeTemplateId).templateLayout
+  }, [
     activeTemplateId,
     requestedTemplateId,
     cvData.presentation?.layout,

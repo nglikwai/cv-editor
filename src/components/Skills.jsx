@@ -11,7 +11,7 @@ export const Skills = ({ skills, updateField }) => {
   const coreSkills = skills.core
 
   return (
-    <div className="cv-section py-3 px-8">
+    <div className="cv-section cv-skills py-3 px-8">
       <h2 className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-deep-blue mb-2.5">
         <span className="shrink-0">Core Skills</span>
         <span className="flex-1 h-px bg-golden-yellow/50" />

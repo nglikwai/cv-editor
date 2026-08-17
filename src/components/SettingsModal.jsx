@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react'
 
+export const SECTION_MARGIN_IDS = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'experience', label: 'Experience' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'certifications', label: 'Certifications' },
+  { id: 'education', label: 'Education' },
+  { id: 'languages', label: 'Languages' },
+]
+
+const defaultSectionMargins = (top, bottom) => (
+  Object.fromEntries(SECTION_MARGIN_IDS.map(({ id }) => [id, { top, bottom }]))
+)
+
 export const DEFAULT_SETTINGS = {
   themeColors: {
     'deep-blue': '#1a365d',
@@ -16,6 +29,10 @@ export const DEFAULT_SETTINGS = {
     textSize: 13,
     lineHeight: 1.4,
     sectionSpacing: 12,
+    sectionGap: 0,
+    sectionMarginTop: 12,
+    sectionMarginBottom: 12,
+    sectionMargins: defaultSectionMargins(12, 12),
     jobSpacing: 16,
     jobItemSpacing: 5,
     headerPaddingY: 24,
@@ -33,6 +50,10 @@ export const TEMPLATE_LAYOUT_DEFAULTS = {
     textSize: 14,
     lineHeight: 1.3,
     sectionSpacing: 14,
+    sectionGap: 0,
+    sectionMarginTop: 14,
+    sectionMarginBottom: 14,
+    sectionMargins: defaultSectionMargins(14, 14),
     jobSpacing: 24,
     jobItemSpacing: 10,
     headerPaddingY: 24,
@@ -65,7 +86,41 @@ export const normalizeSettings = (settings = {}, templateId = 'classic') => {
     templateLayout: {
       textSize: clampNumber(layout.textSize, 11, 18, layoutDefaults.textSize),
       lineHeight: clampNumber(layout.lineHeight, 1.2, 2, layoutDefaults.lineHeight),
-      sectionSpacing: clampNumber(layout.sectionSpacing, 8, 32, layoutDefaults.sectionSpacing),
+      sectionSpacing: clampNumber(
+        layout.sectionSpacing,
+        0,
+        48,
+        layoutDefaults.sectionSpacing,
+      ),
+      sectionGap: clampNumber(layout.sectionGap, 0, 48, layoutDefaults.sectionGap ?? 0),
+      sectionMarginTop: clampNumber(
+        layout.sectionMarginTop ?? layout.sectionSpacing,
+        0,
+        48,
+        layoutDefaults.sectionMarginTop ?? layoutDefaults.sectionSpacing,
+      ),
+      sectionMarginBottom: clampNumber(
+        layout.sectionMarginBottom ?? layout.sectionSpacing,
+        0,
+        48,
+        layoutDefaults.sectionMarginBottom ?? layoutDefaults.sectionSpacing,
+      ),
+      sectionMargins: Object.fromEntries(SECTION_MARGIN_IDS.map(({ id }) => {
+        const fallbackTop = layout.sectionMargins?.[id]?.top
+          ?? layout.sectionMarginTop
+          ?? layout.sectionSpacing
+          ?? layoutDefaults.sectionMargins?.[id]?.top
+          ?? layoutDefaults.sectionMarginTop
+        const fallbackBottom = layout.sectionMargins?.[id]?.bottom
+          ?? layout.sectionMarginBottom
+          ?? layout.sectionSpacing
+          ?? layoutDefaults.sectionMargins?.[id]?.bottom
+          ?? layoutDefaults.sectionMarginBottom
+        return [id, {
+          top: clampNumber(layout.sectionMargins?.[id]?.top, 0, 48, fallbackTop),
+          bottom: clampNumber(layout.sectionMargins?.[id]?.bottom, 0, 48, fallbackBottom),
+        }]
+      })),
       jobSpacing: clampNumber(layout.jobSpacing, 8, 48, layoutDefaults.jobSpacing),
       jobItemSpacing: clampNumber(layout.jobItemSpacing, 0, 24, layoutDefaults.jobItemSpacing),
       headerPaddingY: clampNumber(layout.headerPaddingY, 8, 64, layoutDefaults.headerPaddingY),
@@ -113,11 +168,26 @@ export const applyThemeColors = (themeColors) => {
 }
 
 export const applyTemplateLayout = (templateLayout) => {
-  const layout = { ...DEFAULT_SETTINGS.templateLayout, ...(templateLayout || {}) }
+  const incoming = templateLayout || {}
+  const layout = {
+    ...DEFAULT_SETTINGS.templateLayout,
+    ...incoming,
+    sectionMargins: incoming.sectionMargins,
+  }
   const root = document.documentElement
   root.style.setProperty('--cv-text-size', `${layout.textSize}px`)
   root.style.setProperty('--cv-line-height', layout.lineHeight)
-  root.style.setProperty('--cv-section-spacing', `${layout.sectionSpacing}px`)
+  root.style.setProperty('--cv-section-spacing', `${layout.sectionMarginBottom ?? layout.sectionSpacing}px`)
+  root.style.setProperty('--cv-section-gap', `${layout.sectionGap ?? 0}px`)
+  root.style.setProperty('--cv-section-margin-top', `${layout.sectionMarginTop ?? layout.sectionSpacing}px`)
+  root.style.setProperty('--cv-section-margin-bottom', `${layout.sectionMarginBottom ?? layout.sectionSpacing}px`)
+  SECTION_MARGIN_IDS.forEach(({ id }) => {
+    const margins = layout.sectionMargins?.[id] || {}
+    const top = margins.top ?? layout.sectionMarginTop ?? layout.sectionSpacing
+    const bottom = margins.bottom ?? layout.sectionMarginBottom ?? layout.sectionSpacing
+    root.style.setProperty(`--cv-section-${id}-margin-top`, `${top}px`)
+    root.style.setProperty(`--cv-section-${id}-margin-bottom`, `${bottom}px`)
+  })
   root.style.setProperty('--cv-job-spacing', `${layout.jobSpacing}px`)
   root.style.setProperty('--cv-job-item-spacing', `${layout.jobItemSpacing}px`)
   root.style.setProperty('--cv-header-padding-y', `${layout.headerPaddingY}px`)
@@ -235,6 +305,22 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
     updateWithPreview((prev) => ({
       ...prev,
       templateLayout: { ...prev.templateLayout, [key]: value },
+    }))
+  }
+
+  const handleSectionMarginChange = (id, edge, value) => {
+    updateWithPreview((prev) => ({
+      ...prev,
+      templateLayout: {
+        ...prev.templateLayout,
+        sectionMargins: {
+          ...(prev.templateLayout.sectionMargins || {}),
+          [id]: {
+            ...(prev.templateLayout.sectionMargins?.[id] || {}),
+            [edge]: value,
+          },
+        },
+      },
     }))
   }
 
@@ -377,16 +463,44 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
                 />
               </LayoutGroup>
 
-              <LayoutGroup title="Sections" description="Controls the flow between major CV sections.">
+              <LayoutGroup title="Section margins" description="Overall space between sections, plus top and bottom for each one.">
                 <LayoutControl
-                  label="Section spacing"
-                  value={layout.sectionSpacing}
-                  min={8}
-                  max={32}
+                  label="Between sections"
+                  value={layout.sectionGap ?? 0}
+                  min={0}
+                  max={48}
                   step={1}
                   suffix="px"
-                  onChange={(value) => handleLayoutChange('sectionSpacing', value)}
+                  onChange={(value) => handleLayoutChange('sectionGap', value)}
                 />
+                {SECTION_MARGIN_IDS.map(({ id, label }) => {
+                  const margins = layout.sectionMargins?.[id] || {}
+                  return (
+                    <div key={id}>
+                      <p className="text-[11px] font-semibold text-text-dark px-0.5 mb-1.5">{label}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <LayoutControl
+                          label="Top"
+                          value={margins.top ?? layout.sectionMarginTop}
+                          min={0}
+                          max={48}
+                          step={1}
+                          suffix="px"
+                          onChange={(value) => handleSectionMarginChange(id, 'top', value)}
+                        />
+                        <LayoutControl
+                          label="Bottom"
+                          value={margins.bottom ?? layout.sectionMarginBottom}
+                          min={0}
+                          max={48}
+                          step={1}
+                          suffix="px"
+                          onChange={(value) => handleSectionMarginChange(id, 'bottom', value)}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
               </LayoutGroup>
 
               <LayoutGroup title="Experience" description="Ordered from each job down to its details.">
