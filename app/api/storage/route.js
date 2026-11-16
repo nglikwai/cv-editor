@@ -1,9 +1,12 @@
 import {
+  loadMasterExperience,
+  saveMasterExperience,
   deleteSave,
   deleteVersion,
   listSaves,
   listVersions,
   loadBoard,
+  loadJobDetail,
   getCvTimeline,
   loadFromS3,
   loadSettings,
@@ -11,12 +14,16 @@ import {
   saveSettings,
   saveToS3,
   updateSaveStatus,
+  updateSaveDeadline,
+  updateSaveJobProfile,
 } from '../../../src/lib/s3-server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const operations = {
+  loadMasterExperience: ({ userId }) => loadMasterExperience(userId),
+  saveMasterExperience: ({ data, userId }) => saveMasterExperience(data, userId),
   listSaves: ({ userId }) => listSaves(userId),
   loadFromS3: ({ name, userId }) => loadFromS3(name, userId),
   listVersions: ({ name, userId }) => listVersions(name, userId),
@@ -28,6 +35,9 @@ const operations = {
   saveSettings: ({ data }) => saveSettings(data),
   loadBoard: ({ userId }) => loadBoard(userId),
   getCvTimeline: ({ name, userId }) => getCvTimeline(name, userId),
+  loadJobDetail: ({ name, userId }) => loadJobDetail(name, userId),
+  updateSaveJobProfile: ({ name, profile, userId }) => updateSaveJobProfile(name, profile, userId),
+  updateSaveDeadline: ({ name, deadline, userId }) => updateSaveDeadline(name, deadline, userId),
   updateSaveStatus: ({ name, status, userId }) => updateSaveStatus(name, status, userId),
 }
 
@@ -40,6 +50,7 @@ export async function POST(request) {
     const data = await operation(body)
     return Response.json({ data })
   } catch (error) {
+    if (error.status === 400) return Response.json({ error: error.message }, { status: 400 })
     console.error('Storage request failed:', error)
     return Response.json({ error: 'Storage request failed' }, { status: 500 })
   }

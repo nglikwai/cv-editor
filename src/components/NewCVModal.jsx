@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FiCopy, FiFilePlus } from 'react-icons/fi'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 const formatDate = (date) => new Date(date).toLocaleString('en-GB', {
   day: 'numeric',
@@ -22,6 +23,8 @@ export const NewCVModal = ({ isOpen, boardTag, saves, onCancel, onConfirm }) => 
     setCreating(false)
   }, [isOpen, saves])
 
+  useEscapeKey(isOpen && !creating, onCancel)
+
   if (!isOpen) return null
 
   const selectedSave = saves.find((save) => save.name === sourceName) || saves[0]
@@ -42,11 +45,14 @@ export const NewCVModal = ({ isOpen, boardTag, saves, onCancel, onConfirm }) => 
       onClick={onCancel}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-cv-title"
         className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="px-6 py-5 border-b border-border-light bg-bg-light/60">
-          <h2 className="text-base font-semibold text-deep-blue">Create new CV</h2>
+          <h2 id="new-cv-title" className="text-base font-semibold text-deep-blue">Create new CV</h2>
           <p className="text-xs text-text-light mt-1">
             {boardTag ? <>It will be added to the <strong>{boardTag}</strong> board.</> : 'Choose a starting point for the new CV.'}
           </p>

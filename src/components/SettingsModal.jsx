@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { FiSliders } from 'react-icons/fi'
+
+import { RIGHT_PANEL_WIDTHS, SidePanel, panelButton, panelButtonPrimary } from './SidePanel'
 
 export const SECTION_MARGIN_IDS = [
   { id: 'summary', label: 'Summary' },
@@ -198,7 +201,7 @@ export const applyTemplateLayout = (templateLayout) => {
 }
 
 const LayoutControl = ({ label, value, min, max, step, suffix = '', onChange }) => (
-  <label className="block p-3 rounded-xl bg-gray-50 border border-gray-100">
+  <label className="block p-3 rounded-xl bg-bg-light/50 border border-border-light">
     <span className="flex items-center justify-between gap-3 mb-2">
       <span className="text-xs font-medium text-text-dark">{label}</span>
       <span className="flex items-center gap-1">
@@ -227,8 +230,8 @@ const LayoutControl = ({ label, value, min, max, step, suffix = '', onChange }) 
 )
 
 const LayoutGroup = ({ title, description, children }) => (
-  <section className="rounded-xl border border-gray-100 overflow-hidden">
-    <div className="px-3.5 py-3 bg-gray-50/80 border-b border-gray-100">
+  <section className="rounded-xl border border-border-light overflow-hidden">
+    <div className="px-3.5 py-3 bg-bg-light/60 border-b border-border-light">
       <h4 className="text-xs font-semibold text-text-dark">{title}</h4>
       {description && <p className="text-[11px] text-text-light mt-0.5">{description}</p>}
     </div>
@@ -239,10 +242,10 @@ const LayoutGroup = ({ title, description, children }) => (
 )
 
 const ColorSwatch = ({ colorKey, value, onChange }) => (
-  <label className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer group">
+  <label className="flex items-center gap-3 px-3 py-2 rounded-lg bg-bg-light/50 hover:bg-bg-light transition-colors cursor-pointer group">
     <div className="relative shrink-0">
       <div
-        className="w-9 h-9 rounded-lg shadow-sm border border-gray-200 group-hover:shadow-md transition-shadow"
+        className="w-9 h-9 rounded-lg shadow-sm border border-border-light group-hover:shadow-md transition-shadow"
         style={{ backgroundColor: value }}
       />
       <input
@@ -342,31 +345,29 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
   const layout = localSettings.templateLayout || getTemplateLayoutDefaults(templateId)
 
   return (
-    <div className={`fixed inset-0 z-[2000] pointer-events-none print:hidden ${visible ? '' : 'hidden'}`}>
-      <aside className="left-settings-drawer pointer-events-auto absolute top-[calc(3.5rem+env(safe-area-inset-top,0px))] md:top-16 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-0 left-0 bg-white shadow-2xl border-r border-border-light w-full md:w-[420px] max-w-full flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
-          <div>
-            <h2 className="text-lg font-semibold text-deep-blue">Theme Settings</h2>
-            <p className="text-xs text-text-light mt-0.5">Changes preview instantly on your CV.</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200/60 transition-colors text-xl leading-none"
-          >
-            &times;
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-8">
+    <SidePanel
+      title="Theme Settings"
+      icon={FiSliders}
+      description="Changes preview instantly on your CV."
+      width={RIGHT_PANEL_WIDTHS.settings}
+      visible={visible}
+      onClose={onClose}
+      closeLabel="Close theme settings"
+      footer={(
+        <>
+          <button type="button" onClick={onClose} className={panelButton}>Cancel</button>
+          <button type="button" onClick={() => onSave(localSettings)} className={panelButtonPrimary}>Save Settings</button>
+        </>
+      )}
+    >
+        <div className="flex flex-col gap-8">
           {/* Theme Colors */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-deep-blue">Theme Colors</h3>
+              <h3 className="text-[10px] uppercase tracking-wider font-semibold text-text-light">Theme Colors</h3>
               <button
                 onClick={handleResetColors}
-                className="text-xs text-text-light hover:text-deep-blue transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-100"
+                className="text-xs text-text-light hover:text-deep-blue transition-colors cursor-pointer px-2 py-1 rounded hover:bg-bg-light"
               >
                 Reset to defaults
               </button>
@@ -400,20 +401,20 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
           </div>
 
           {/* Divider */}
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-border-light" />
 
           {/* Template Layout */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-semibold text-deep-blue">
+                <h3 className="text-[10px] uppercase tracking-wider font-semibold text-text-light">
                   {templateId.charAt(0).toUpperCase() + templateId.slice(1)} Template Layout
                 </h3>
                 <p className="text-xs text-text-light mt-0.5">Saved with this CV and applied to its PDF output.</p>
               </div>
               <button
                 onClick={handleResetLayout}
-                className="text-xs text-text-light hover:text-deep-blue transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-100"
+                className="text-xs text-text-light hover:text-deep-blue transition-colors cursor-pointer px-2 py-1 rounded hover:bg-bg-light"
               >
                 Reset
               </button>
@@ -559,39 +560,22 @@ export const SettingsModal = ({ isOpen, visible = true, onClose, settings, templ
             </div>
           </div>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-border-light" />
 
           {/* AI Prompt */}
           <div>
-            <h3 className="text-sm font-semibold text-deep-blue mb-1">AI Prompt Template</h3>
+            <h3 className="text-[10px] uppercase tracking-wider font-semibold text-text-light mb-1">AI Prompt Template</h3>
             <p className="text-xs text-text-light mb-3">
-              Use <code className="bg-gray-100 px-1.5 py-0.5 rounded text-deep-blue font-semibold">{'{cv_json}'}</code> where your CV data should be inserted.
+              Use <code className="bg-bg-light px-1.5 py-0.5 rounded text-deep-blue font-semibold">{'{cv_json}'}</code> where your CV data should be inserted.
             </p>
             <textarea
               value={localSettings.aiPromptTemplate}
               onChange={(e) => handlePromptChange(e.target.value)}
               rows={30}
-              className="w-full min-h-64 p-3 text-sm border border-gray-200 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-light-blue/40 focus:border-light-blue transition-shadow bg-gray-50 font-mono leading-relaxed"
+              className="w-full min-h-64 p-3 text-sm border border-border-light rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-light-blue/40 focus:border-light-blue transition-shadow bg-bg-light/50 font-mono leading-relaxed"
             />
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 border border-gray-200 rounded-lg cursor-pointer text-sm font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(localSettings)}
-            className="px-5 py-2 border-none rounded-lg cursor-pointer text-sm font-medium transition-all duration-200 bg-deep-blue text-white hover:bg-light-blue shadow-sm"
-          >
-            Save Settings
-          </button>
-        </div>
-      </aside>
-    </div>
+    </SidePanel>
   )
 }

@@ -1,4 +1,7 @@
 import 'server-only'
+import { validateMasterExperience } from '../utils/masterExperience'
+import { assessJobMatch, summarizeJobProfile, validateJobProfile } from '../utils/jobMatch'
+import { normalizeDeadline, validateDeadline } from '../utils/deadlines'
 
 import {
   DeleteObjectCommand,
@@ -67,6 +70,8 @@ const DEFAULT_BOARD = {
   columns: DEFAULT_BOARD_COLUMNS,
   statuses: {},
   timeline: {},
+  deadlines: {},
+  jobProfiles: {},
 }
 
 const userFolder = (userId = 'default') => userId === 'default'
@@ -81,6 +86,8 @@ const userTagsKey = (userId = 'default') => userId === 'default' ? TAGS_KEY : `$
 const userBoardKey = (userId = 'default') => userId === 'default' ? BOARD_KEY : `${userFolder(userId)}/board.json`
 const cvKey = (name, userId = 'default') => `${userFolder(userId)}/${name}.json`
 const versionPrefix = (name, userId = 'default') => `${userFolder(userId)}/versions/${encodeURIComponent(name)}/`
+// One file per job, in a subfolder so it is never listed as a CV.
+const jobKey = (name, userId = 'default') => `${userFolder(userId)}/jobs/${encodeURIComponent(name)}.json`
 const versionKey = (name, versionId, userId = 'default') => `${versionPrefix(name, userId)}${encodeURIComponent(versionId)}.json`
 
 const loadTags = async (userId = 'default') => {
@@ -125,7 +132,7 @@ export const listSaves = async (userId = 'default') => {
     loadBoard(userId).catch(() => ({ ...DEFAULT_BOARD, statuses: {} })),
   ])
   const objects = [...(response.Contents || []), ...(legacyResponse.Contents || [])]
-  return objects
+  const saves = objects
     .filter((obj) => {
       if (!obj.Key.endsWith('.json')) return false
       const sourcePrefix = obj.Key.startsWith(prefix) ? prefix : `${LEGACY_FOLDER}/`
@@ -144,9 +151,13 @@ export const listSaves = async (userId = 'default') => {
         size: obj.Size,
         tags: tags[name] || [],
         status: board.statuses[name] || 'draft',
+        deadline: normalizeDeadline(board.deadlines?.[name]),
       }
     })
     .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified))
+  // Cards only need the job summary held in the board file; the full job
+  // detail is loaded from its own file when a CV is opened.
+  return saves.map((save) => ({ ...save, jobProfile: summarizeJobProfile(board.jobProfiles?.[save.name]) }))
 }
 
 export const loadFromS3 = async (name, userId = 'default') => {
@@ -242,12 +253,14 @@ export const deleteSave = async (name, userId = 'default') => {
     }))
   }
   const [tags, board] = await Promise.all([loadTags(userId), loadBoard(userId)])
-  const jobs = []
+  const jobs = [getS3Client().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: jobKey(name, userId) }))]
   if (name in tags) {
     delete tags[name]
     jobs.push(saveTags(tags, userId))
   }
-  if (name in board.statuses || name in (board.timeline || {})) {
+  if (name in board.statuses || name in (board.timeline || {}) || name in (board.deadlines || {}) || name in (board.jobProfiles || {})) {
+    if (board.deadlines) delete board.deadlines[name]
+    if (board.jobProfiles) delete board.jobProfiles[name]
     delete board.statuses[name]
     if (board.timeline) delete board.timeline[name]
     jobs.push(saveBoard(board, userId))
@@ -349,13 +362,15 @@ export const loadBoard = async (userId = 'default') => {
       ],
       statuses,
       timeline: data.timeline || {},
+      deadlines: data.deadlines || {},
+      jobProfiles: data.jobProfiles || {},
     }
   } catch (error) {
     if (error.name === 'NoSuchKey' && userId === 'default') {
       const legacy = await getS3Client().send(new GetObjectCommand({ Bucket: BUCKET, Key: legacyBoardKey, ResponseCacheControl: NO_CACHE })).catch(() => null)
       if (legacy) {
         const data = JSON.parse(await legacy.Body.transformToString())
-        return { ...data, statuses: data.statuses || {}, timeline: data.timeline || {} }
+        return { ...data, statuses: data.statuses || {}, timeline: data.timeline || {}, deadlines: data.deadlines || {}, jobProfiles: data.jobProfiles || {} }
       }
     }
     if (error.name === 'NoSuchKey') return { ...DEFAULT_BOARD }
@@ -379,6 +394,62 @@ export const updateSaveStatus = async (name, status, userId = 'default') => {
   board.statuses[name] = status
   await appendTimelineEvent(userId, name, { type: 'status', status }, board)
   return board
+}
+
+export const updateSaveDeadline = async (name, deadline, userId = 'default') => {
+  let normalized
+  try {
+    if (typeof name !== 'string' || !name.trim()) throw new Error('Choose a saved CV.')
+    normalized = validateDeadline(deadline)
+  } catch (error) {
+    error.status = 400
+    throw error
+  }
+  if (!await cvObjectExists(name, userId)) {
+    const error = new Error('Saved CV not found.')
+    error.status = 400
+    throw error
+  }
+  const board = await loadBoard(userId)
+  board.deadlines = { ...(board.deadlines || {}), [name]: normalized }
+  await saveBoard(board, userId)
+  return normalized
+}
+
+// Full job detail (description, requirements, advert link) for one CV.
+// Jobs saved before details moved to their own files are still read from the
+// board file until they are next saved.
+export const loadJobDetail = async (name, userId = 'default') => {
+  if (typeof name !== 'string' || !name.trim()) return null
+  try {
+    const response = await getS3Client().send(new GetObjectCommand({ Bucket: BUCKET, Key: jobKey(name, userId), ResponseCacheControl: NO_CACHE }))
+    return JSON.parse(await response.Body.transformToString())
+  } catch (error) {
+    if (error.name !== 'NoSuchKey') throw error
+    const board = await loadBoard(userId)
+    const legacy = board.jobProfiles?.[name]
+    return Array.isArray(legacy?.requirements) ? { description: '', ...legacy } : null
+  }
+}
+
+export const updateSaveJobProfile = async (name, profile, userId = 'default') => {
+  let jobProfile
+  try { jobProfile = validateJobProfile(profile) } catch (error) { error.status = 400; throw error }
+  const cv = await loadFromS3(name, userId)
+  if (!cv) { const error = new Error('Saved CV not found.'); error.status = 400; throw error }
+  // Write the detail file first: if the board update then fails, the board
+  // still holds the previous copy and nothing is lost.
+  await getS3Client().send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: jobKey(name, userId),
+    Body: JSON.stringify({ ...jobProfile, updatedAt: new Date().toISOString() }, null, 2),
+    ContentType: 'application/json',
+    CacheControl: NO_CACHE,
+  }))
+  const board = await loadBoard(userId)
+  board.jobProfiles = { ...(board.jobProfiles || {}), [name]: summarizeJobProfile(jobProfile) }
+  await saveBoard(board, userId)
+  return { jobProfile, match: assessJobMatch(jobProfile, cv) }
 }
 
 const EDIT_COLLAPSE_MS = 2 * 60 * 60 * 1000
@@ -503,4 +574,43 @@ export const getCvTimeline = async (name, userId = 'default') => {
 
   events.sort((a, b) => new Date(b.at) - new Date(a.at))
   return { events, status: board.statuses?.[name] || 'draft' }
+}
+
+
+// The master lives in its own folder so it cannot be mistaken for a saved CV.
+const masterExperienceKey = (userId = 'default') => `${userFolder(userId)}/master/master.json`
+
+export const loadMasterExperience = async (userId = 'default') => {
+  try {
+    const response = await getS3Client().send(new GetObjectCommand({ Bucket: BUCKET, Key: masterExperienceKey(userId), ResponseCacheControl: NO_CACHE }))
+    return validateMasterExperience(JSON.parse(await response.Body.transformToString()))
+  } catch (error) {
+    if (error.name === 'NoSuchKey') return null
+    throw error
+  }
+}
+
+export const saveMasterExperience = async (data, userId = 'default') => {
+  let master
+  try { master = validateMasterExperience(data) } catch (error) { error.status = 400; throw error }
+  if (master.analysis?.method === 'llm') {
+    const previous = await loadMasterExperience(userId)
+    if (previous && !previous.analysis) {
+      try {
+        await getS3Client().send(new PutObjectCommand({
+          Bucket: BUCKET, Key: `${userFolder(userId)}/master/source-archive.json`,
+          Body: JSON.stringify(previous, null, 2), ContentType: 'application/json',
+          CacheControl: NO_CACHE, IfNoneMatch: '*',
+        }))
+      } catch (error) {
+        if (error.name !== 'PreconditionFailed' && error.$metadata?.httpStatusCode !== 412) throw error
+      }
+    }
+  }
+  master.updatedAt = new Date().toISOString()
+  await getS3Client().send(new PutObjectCommand({
+    Bucket: BUCKET, Key: masterExperienceKey(userId), Body: JSON.stringify(master, null, 2),
+    ContentType: 'application/json', CacheControl: NO_CACHE,
+  }))
+  return master
 }

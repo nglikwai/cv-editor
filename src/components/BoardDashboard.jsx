@@ -4,13 +4,16 @@ import {
   FiCheck,
   FiChevronDown,
   FiClock,
+  FiCalendar,
   FiPlus,
   FiRefreshCw,
   FiTag,
   FiTrash2,
 } from 'react-icons/fi'
-import { deleteSave, listSaves, loadBoard, updateSaveStatus } from '../services/s3'
+import { deleteSave, listSaves, loadBoard, updateSaveStatus, updateSaveDeadline } from '../services/s3'
 import { NewCVModal } from './NewCVModal'
+import { DeadlineModal } from './DeadlineModal'
+import { DEADLINE_FILTERS, getDeadlineInfo, londonToday, matchesDeadlineFilter } from '../utils/deadlines'
 import { workspaceStorageKey } from '../hooks/useWorkspaceUser'
 
 const DASHBOARD_PREFERENCES_KEY = 'cv-dashboard-preferences'
@@ -22,9 +25,10 @@ const loadDashboardPreferences = (userId = 'default') => {
     return {
       boardTag: typeof saved.boardTag === 'string' ? saved.boardTag : '',
       monthRange: validRanges.includes(saved.monthRange) ? saved.monthRange : 2,
+      deadlineFilter: DEADLINE_FILTERS.some((option) => option.value === saved.deadlineFilter) ? saved.deadlineFilter : 'all',
     }
   } catch {
-    return { boardTag: '', monthRange: 2 }
+    return { boardTag: '', monthRange: 2, deadlineFilter: 'all' }
   }
 }
 
@@ -58,7 +62,11 @@ const BoardCard = ({
   onDragEnd,
   onLoad,
   onDelete,
+  onEditDeadline,
+  today,
 }) => {
+  const deadline = getDeadlineInfo(save.deadline, today)
+  const deadlineTone = { soon: 'border-amber-200 bg-amber-50 text-amber-900', closed: 'border-red-200 bg-red-50 text-red-800', normal: 'border-sky-200 bg-sky-50 text-sky-900', muted: 'border-border-light bg-bg-light text-text-light' }[deadline.tone]
   const didDrag = useRef(false)
 
   const handleClick = () => {
@@ -84,12 +92,13 @@ const BoardCard = ({
       }}
       onClick={handleClick}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           handleClick()
         }
       }}
-      className={`group bg-white rounded-lg border border-border-light shadow-sm p-3 cursor-pointer active:cursor-grabbing transition-all select-none ${
+      className={`group bg-white rounded-2xl border border-border-light shadow-sm p-5 cursor-pointer active:cursor-grabbing transition-all select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-deep-blue ${
         isDragging
           ? 'opacity-40 scale-95 rotate-1'
           : isLoading
@@ -98,24 +107,28 @@ const BoardCard = ({
       }`}
       title="Click to open in editor · Drag to change status"
     >
-      <div className="flex items-start justify-between gap-2 mb-1.5">
+      <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="min-w-0 max-w-full flex-1 text-sm font-semibold text-text-dark leading-snug break-words [overflow-wrap:anywhere]">
-          {save.name}
+          <span className="block text-[10px] uppercase tracking-widest text-teal-700 font-bold mb-1">{save.jobProfile?.company || 'CV workspace'}</span>
+          {save.jobProfile?.title || save.name}
+          {save.jobProfile?.location && <span className="block text-[11px] font-normal text-text-light mt-1">{save.jobProfile.location}</span>}
         </h4>
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             onClick={(e) => {
               e.stopPropagation()
               onDelete(save.name)
             }}
-            title={confirmDelete === save.name ? 'Confirm delete' : 'Delete'}
-            className={`p-1.5 rounded-md transition-colors ${
+            title={confirmDelete === save.name ? 'Click again to delete permanently' : 'Delete'}
+            aria-label={confirmDelete === save.name ? `Confirm deleting ${save.name}` : `Delete ${save.name}`}
+            className={`flex items-center gap-1 p-1.5 rounded-md text-[11px] font-semibold leading-none transition-all group-hover:opacity-100 focus-visible:opacity-100 ${
               confirmDelete === save.name
                 ? 'bg-red-600 text-white'
-                : 'text-text-light hover:text-red-500 hover:bg-red-50'
+                : 'opacity-50 text-text-light hover:text-red-500 hover:bg-red-50'
             }`}
           >
             <FiTrash2 size={13} />
+            {confirmDelete === save.name && <span>Delete?</span>}
           </button>
         </div>
       </div>
@@ -123,6 +136,21 @@ const BoardCard = ({
       <p className="text-[11px] text-text-light mb-2" title={formatDate(save.lastModified)}>
         {isLoading ? 'Opening…' : formatRelative(save.lastModified)}
       </p>
+
+      <button
+        type="button"
+        draggable={false}
+        onClick={(event) => { event.stopPropagation(); onEditDeadline(save) }}
+        aria-label={`Edit deadline for ${save.name}`}
+        title="Edit job deadline"
+        className={`flex w-full items-start gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] mb-2 hover:brightness-95 focus-visible:outline-2 focus-visible:outline-deep-blue ${deadlineTone}`}
+      >
+        <FiCalendar size={13} className="shrink-0 mt-0.5" />
+        <span>
+          <span className="block font-semibold">{deadline.label}</span>
+          {deadline.detail && deadline.kind !== 'closed' && <span className="block mt-0.5">{deadline.detail}</span>}
+        </span>
+      </button>
 
       {save.tags?.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -155,18 +183,20 @@ const BoardColumn = ({
   onDrop,
   onLoad,
   onDelete,
+  onEditDeadline,
+  today,
 }) => {
   return (
     <div
       data-column-id={column.id}
-      className={`snap-start [scroll-snap-stop:always] flex flex-col min-w-[min(16.25rem,calc(100vw-2rem))] w-[min(16.25rem,calc(100vw-2rem))] max-h-full rounded-xl transition-colors ${
+      className={`snap-start [scroll-snap-stop:always] flex flex-col min-w-[min(21rem,calc(100vw-2rem))] w-[min(21rem,calc(100vw-2rem))] max-h-full rounded-xl transition-colors ${
         dragOver ? 'bg-deep-blue/5 ring-2 ring-deep-blue/20' : 'bg-bg-light/80'
       }`}
       onDragOver={(e) => onDragOver(e, column.id)}
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, column.id)}
     >
-      <div className="flex items-center gap-2 px-3 py-3 sticky top-0 z-10">
+      <div className="flex items-center gap-2 px-4 py-3.5 sticky top-0 z-10">
         <span
           className="w-2.5 h-2.5 rounded-full shrink-0"
           style={{ backgroundColor: column.color }}
@@ -179,14 +209,18 @@ const BoardColumn = ({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-2 min-h-[120px]">
+      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3 min-h-[120px]">
         {saves.length === 0 ? (
           <div
-            className={`rounded-lg border-2 border-dashed px-3 py-8 text-center text-xs text-text-light transition-colors ${
-              dragOver ? 'border-deep-blue/40 bg-white/50' : 'border-border-light'
+            className={`rounded-lg border-2 border-dashed px-3 py-8 text-center text-xs transition-colors ${
+              dragOver
+                ? 'border-deep-blue/40 bg-white/50 text-deep-blue'
+                : draggingName
+                  ? 'border-border-light text-text-light'
+                  : 'border-transparent text-text-light/70'
             }`}
           >
-            Drop CV here
+            {draggingName ? 'Drop CV here' : 'No CVs'}
           </div>
         ) : (
           saves.map((save) => (
@@ -200,6 +234,8 @@ const BoardColumn = ({
               onDragEnd={onDragEnd}
               onLoad={onLoad}
               onDelete={onDelete}
+              onEditDeadline={onEditDeadline}
+              today={today}
             />
           ))
         )}
@@ -255,7 +291,7 @@ const BoardPicker = ({ saves, tags, value, onChange }) => {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className={`group flex items-center gap-2.5 w-40 sm:w-52 px-3 py-2 rounded-xl border bg-white text-left transition-all ${
+        className={`group flex items-center gap-2.5 w-52 sm:w-72 px-3 py-2 rounded-xl border bg-white text-left transition-all ${
           open
             ? 'border-deep-blue/50 ring-4 ring-deep-blue/10 shadow-md'
             : 'border-border-light shadow-sm hover:border-deep-blue/30 hover:shadow-md'
@@ -341,6 +377,9 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
   const [monthRange, setMonthRange] = useState(2)
   const [prefsUserId, setPrefsUserId] = useState(null)
   const [newCVOpen, setNewCVOpen] = useState(false)
+  const [deadlineFilter, setDeadlineFilter] = useState('all')
+  const [editingDeadline, setEditingDeadline] = useState(null)
+  const [today, setToday] = useState(londonToday)
   const boardScrollRef = useRef(null)
   const initialScrollSet = useRef(false)
 
@@ -348,9 +387,16 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
     const preferences = loadDashboardPreferences(userId)
     setSelectedBoardTag(preferences.boardTag)
     setMonthRange(preferences.monthRange)
+    setDeadlineFilter(preferences.deadlineFilter)
+    setEditingDeadline(null)
     setPrefsUserId(userId)
     initialScrollSet.current = false
   }, [userId])
+
+  useEffect(() => {
+    const timer = setInterval(() => setToday(londonToday()), 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   const fetchBoard = useCallback(async (isRefresh = false) => {
     try {
@@ -379,11 +425,12 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
       localStorage.setItem(workspaceStorageKey(DASHBOARD_PREFERENCES_KEY, userId), JSON.stringify({
         boardTag: selectedBoardTag,
         monthRange,
+        deadlineFilter,
       }))
     } catch {
       // Local preferences are optional when storage is unavailable.
     }
-  }, [selectedBoardTag, monthRange, userId, prefsUserId])
+  }, [selectedBoardTag, monthRange, deadlineFilter, userId, prefsUserId])
 
   useLayoutEffect(() => {
     if (loading || !columns.length || initialScrollSet.current) return
@@ -428,13 +475,17 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
 
   const filteredSaves = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q) return boardSaves
-    return boardSaves.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.tags || []).some((t) => t.toLowerCase().includes(q)),
-    )
-  }, [boardSaves, filter])
+    const matchesSearch = (save) => [
+      save.name,
+      save.jobProfile?.title,
+      save.jobProfile?.company,
+      save.jobProfile?.location,
+      ...(save.tags || []),
+    ].some((value) => typeof value === 'string' && value.toLowerCase().includes(q))
+    return boardSaves.filter((save) => (
+      (!q || matchesSearch(save)) && matchesDeadlineFilter(save.deadline, deadlineFilter, today)
+    ))
+  }, [boardSaves, filter, deadlineFilter, today])
 
   const savesByStatus = useMemo(() => {
     const map = Object.fromEntries(columns.map((c) => [c.id, []]))
@@ -477,8 +528,10 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
     setDragOverColumn(null)
     const name = e.dataTransfer.getData('text/plain') || draggingName
     setDraggingName(null)
-    if (!name) return
+    if (name) moveSave(name, columnId)
+  }
 
+  const moveSave = async (name, columnId) => {
     const save = saves.find((s) => s.name === name)
     if (!save || save.status === columnId) return
 
@@ -524,10 +577,17 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
     }
   }
 
+  const handleSaveDeadline = async (name, deadline) => {
+    const savedDeadline = await updateSaveDeadline(name, deadline, userId)
+    setSaves((current) => current.map((save) => save.name === name ? { ...save, deadline: savedDeadline } : save))
+    setEditingDeadline(null)
+  }
+
   const totalCount = boardSaves.length
 
   return (
     <div className="h-full min-h-0 bg-[var(--app-canvas)] flex flex-col print:hidden">
+      {editingDeadline && <DeadlineModal key={editingDeadline.name} save={editingDeadline} onCancel={() => setEditingDeadline(null)} onSave={handleSaveDeadline} />}
       <NewCVModal
         isOpen={newCVOpen}
         boardTag={selectedBoardTag}
@@ -536,7 +596,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
         onConfirm={(sourceSave) => onCreateNew(selectedBoardTag, sourceSave)}
       />
       {/* Header */}
-      <header className="bg-white border-b border-border-light px-3 sm:px-5 py-3 flex flex-wrap items-center gap-2 sm:gap-4 shrink-0">
+      <header className="bg-white border-b border-border-light px-4 sm:px-5 py-4 flex flex-wrap items-center gap-3 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <BoardPicker
             saves={recentSaves}
@@ -545,7 +605,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
             onChange={setSelectedBoardTag}
           />
           <span className="text-xs text-text-light hidden sm:inline">
-            {totalCount} version{totalCount !== 1 ? 's' : ''}
+            {filteredSaves.length === totalCount ? totalCount : `${filteredSaves.length} of ${totalCount}`} CV{totalCount !== 1 ? 's' : ''}
           </span>
         </div>
 
@@ -572,6 +632,14 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
           ))}
         </div>
 
+        <label className="flex items-center gap-2 text-xs text-text-light">
+          <FiCalendar size={15} aria-hidden="true" />
+          <span className="sr-only">Filter by deadline</span>
+          <select aria-label="Filter by deadline" value={deadlineFilter} onChange={(event) => setDeadlineFilter(event.target.value)} className="w-40 border border-border-light rounded-lg px-3 py-2 text-xs text-text-dark bg-white">
+            {DEADLINE_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+
         <div className="flex-1" />
 
         {recoverableDraft && (
@@ -588,7 +656,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
 
         <button
           onClick={() => setNewCVOpen(true)}
-          className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 bg-deep-blue text-white rounded-lg hover:bg-light-blue transition-colors shrink-0"
+          className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 bg-deep-blue text-white rounded-lg hover:bg-light-blue transition-colors shrink-0"
         >
           <FiPlus size={16} />
           <span className="hidden sm:inline">New CV</span>
@@ -598,8 +666,9 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
           type="search"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by name or tag…"
-          className="w-full order-last basis-full lg:order-none lg:basis-auto lg:w-44 xl:w-56 text-sm border border-border-light rounded-lg px-3 py-1.5 text-text-dark focus:outline-none focus:ring-2 focus:ring-deep-blue/20 bg-bg-light/50"
+          placeholder="Search job, company or tag…"
+          aria-label="Search CVs"
+          className="w-full order-last basis-full lg:order-none lg:basis-auto lg:w-52 xl:w-64 text-sm border border-border-light rounded-lg px-3 py-2 text-text-dark focus:outline-none focus:ring-2 focus:ring-deep-blue/20 bg-bg-light/50"
         />
 
         <button
@@ -615,8 +684,21 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
       {/* Body */}
       <div className="flex-1 overflow-hidden p-3 sm:p-4">
         {loading ? (
-          <div className="h-full flex items-center justify-center text-sm text-text-light">
-            Loading board…
+          <div role="status" aria-label="Loading board" className="h-full flex gap-3 overflow-hidden">
+            {[3, 1, 2, 0].map((cards, index) => (
+              <div key={index} className="w-[min(21rem,calc(100vw-2rem))] shrink-0 rounded-xl bg-bg-light/80 p-3 animate-pulse">
+                <div className="h-3 w-24 rounded bg-border-light mb-4" />
+                <div className="space-y-2">
+                  {Array.from({ length: cards }, (_, card) => (
+                    <div key={card} className="rounded-2xl border border-border-light bg-white p-4 space-y-2.5">
+                      <div className="h-2 w-20 rounded bg-border-light" />
+                      <div className="h-3 w-40 rounded bg-border-light" />
+                      <div className="h-7 rounded-lg bg-bg-light" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : error && !columns.length ? (
           <div className="h-full flex flex-col items-center justify-center gap-3">
@@ -661,17 +743,37 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
               <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
                 <FiClock size={24} className="text-text-light" />
                 <div>
-                  <h2 className="text-base font-semibold text-text-dark">No recent CVs</h2>
+                  <h2 className="text-base font-semibold text-text-dark">
+                    {monthRange === 'all' ? 'This board is empty' : 'No recent CVs on this board'}
+                  </h2>
                   <p className="text-sm text-text-light mt-1">
-                    No CVs were updated in the last {monthRange} months.
+                    {monthRange === 'all'
+                      ? `No CVs are ${selectedBoardTag ? `tagged “${selectedBoardTag}”` : 'untagged'} yet.`
+                      : `Nothing on the ${selectedBoardTag || 'Uncategorized'} board was updated in the last ${monthRange} months.`}
                   </p>
                 </div>
-                <button
-                  onClick={() => setMonthRange('all')}
-                  className="text-sm font-medium px-4 py-2 border border-border-light text-deep-blue bg-white rounded-lg hover:bg-bg-light transition-colors"
-                >
-                  View all CVs
-                </button>
+                {monthRange === 'all' ? (
+                  <button
+                    onClick={() => setNewCVOpen(true)}
+                    className="text-sm font-medium px-4 py-2 bg-deep-blue text-white rounded-lg hover:bg-light-blue transition-colors"
+                  >
+                    New CV
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setMonthRange('all')}
+                    className="text-sm font-medium px-4 py-2 border border-border-light text-deep-blue bg-white rounded-lg hover:bg-bg-light transition-colors"
+                  >
+                    View all CVs
+                  </button>
+                )}
+              </div>
+            ) : filteredSaves.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                <FiCalendar size={24} className="text-text-light" />
+                <h2 className="text-base font-semibold text-text-dark">No CVs match these filters</h2>
+                <p className="text-sm text-text-light">Try another deadline filter or search.</p>
+                <button type="button" onClick={() => { setFilter(''); setDeadlineFilter('all') }} className="text-sm px-4 py-2 border border-border-light rounded-lg text-deep-blue bg-white">Clear filters</button>
               </div>
             ) : (
               <div className="flex gap-3 h-full min-w-min pb-1">
@@ -691,6 +793,8 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
                     onDrop={handleDrop}
                     onLoad={handleLoad}
                     onDelete={handleDelete}
+                    onEditDeadline={setEditingDeadline}
+                          today={today}
                   />
                 ))}
               </div>
@@ -701,7 +805,7 @@ export const BoardDashboard = ({ onCreateNew, onLoad, recoverableDraft, onRecove
 
       {/* Footer hint */}
       <footer className="hidden sm:flex px-5 py-2 border-t border-border-light bg-white/80 text-[11px] text-text-light items-center gap-4 shrink-0">
-        <span>Click a card to open in editor · Drag between columns to update status</span>
+        <span>Click a card to open a tab · Click its deadline to edit · Drag between columns to change status</span>
       </footer>
     </div>
   )

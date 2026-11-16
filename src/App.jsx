@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react'
 import { flushSync } from 'react-dom'
+import { FiAlertCircle, FiCheckCircle, FiClock } from 'react-icons/fi'
 import { Toolbar } from './components/Toolbar'
-import { ScratchNotes } from './components/ScratchNotes'
 import { AppLayout } from './components/AppLayout'
 import { CVPage, CV_TEMPLATES } from './components/CVPage'
 import { BoardDashboard } from './components/BoardDashboard'
+import { MasterExperience } from './components/MasterExperience'
+import { JobSidebar } from './components/JobSidebar'
 import { JsonEditorModal } from './components/JsonEditorModal'
 import { SaveNameModal } from './components/SaveNameModal'
-import { SavesModal } from './components/SavesModal'
+import { RIGHT_PANEL_WIDTHS } from './components/SidePanel'
+import { VersionsDrawer } from './components/VersionsDrawer'
 import {
   SettingsModal,
   DEFAULT_SETTINGS,
@@ -33,6 +36,7 @@ import initialData from '../cv.json'
 const COLOR_MODE_KEY = 'cv-color-mode'
 const AUTO_SAVE_KEY = 'cv-auto-save'
 const UNSAVED_DRAFT_KEY = 'cv-unsaved-draft'
+const SIDEBAR_COLLAPSED_KEY = 'cv-job-sidebar-collapsed'
 
 const loadDarkMode = (userId) => {
   try {
@@ -67,6 +71,7 @@ const loadUnsavedDraft = (userId) => {
 
 const readRoute = () => {
   if (typeof window === 'undefined') return { view: 'board', name: null }
+  if (/^\/master\/?$/.test(window.location.pathname)) return { view: 'master', name: null }
   const match = window.location.pathname.match(/^\/editor(?:\/([^/]+))?\/?$/)
   if (!match) return { view: 'board', name: null }
 
@@ -128,10 +133,22 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
+  // Left job sidebar: which tab is showing, and whether it is unfolded on
+  // small screens (it is always visible on wide ones).
+  const [sidebarTab, setSidebarTab] = useState('match')
+  const [sidebarExpanded, setSidebarExpanded] = useState(false)
+  // Wide screens: the job sidebar can shrink to a slim icon rail.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [saveNameOpen, setSaveNameOpen] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
   const [boardOpen, setBoardOpen] = useState(true)
+  const [masterOpen, setMasterOpen] = useState(false)
+  const [masterDirty, setMasterDirty] = useState(false)
+  const [masterBusy, setMasterBusy] = useState(false)
+  const [editorTabs, setEditorTabs] = useState([])
+  const [activeTabId, setActiveTabId] = useState(null)
+  const tabSessions = useRef(new Map())
+  const tabActions = useRef({})
   const [routeLoading, setRouteLoading] = useState(false)
   const [currentSaveName, setCurrentSaveName] = useState(null)
   const [currentSaveTags, setCurrentSaveTags] = useState([])
@@ -149,9 +166,21 @@ function App() {
   const [printPreview, setPrintPreview] = useState(true)
   const [unsavedDraft, setUnsavedDraft] = useState(null)
   const autoSaveBaselineRef = useRef({ name: null, snapshot: JSON.stringify(initialData) })
+  // Mirrors the baseline snapshot in state so the UI can show whether the CV
+  // on screen differs from what was last loaded or saved.
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initialData))
+  const setBaseline = useCallback((name, snapshot) => {
+    autoSaveBaselineRef.current = { name, snapshot }
+    setSavedSnapshot(snapshot)
+  }, [])
+  const snackbarTimerRef = useRef(null)
+  const handleSaveRef = useRef(null)
   const autoSaveQueueRef = useRef(Promise.resolve())
   const autoSaveTimerRef = useRef(null)
   const previewPositionedRef = useRef(false)
+  const recentreSmoothRef = useRef(false)
+  const recentreTimerRef = useRef(null)
+  const [recentreKey, setRecentreKey] = useState(0)
   const requestedTemplateId = cvData.presentation?.templateId || 'modern'
   const normalizedTemplateId = requestedTemplateId === 'simple' ? 'classic' : requestedTemplateId
   const activeTemplateId = CV_TEMPLATES.some((template) => template.id === normalizedTemplateId)
@@ -189,6 +218,53 @@ function App() {
     themeColors: effectiveThemeColors,
     templateLayout: effectiveTemplateLayout,
   }), [settings, effectiveThemeColors, effectiveTemplateLayout])
+
+  // Keep each document's working copy separate from its saved baseline.
+  // Switching tabs restores both, so edited CVs never overwrite one another.
+  useLayoutEffect(() => {
+    if (!activeTabId || routeLoading) return
+    tabSessions.current.set(activeTabId, {
+      id: activeTabId, data: cvData, name: currentSaveName, tags: currentSaveTags,
+      version: currentVersionId, baseline: savedSnapshot,
+      sidebarTab, sidebarExpanded, jsonEditorOpen, settingsOpen, savesOpen, printPreview,
+    })
+  }, [activeTabId, routeLoading, cvData, currentSaveName, currentSaveTags,
+    currentVersionId, savedSnapshot, sidebarTab, sidebarExpanded,
+    jsonEditorOpen, settingsOpen, savesOpen, printPreview])
+
+  const createEditorTab = () => {
+    setMasterOpen(false)
+    const id = crypto.randomUUID()
+    setEditorTabs((tabs) => [...tabs, id])
+    setActiveTabId(id)
+    setJsonEditorOpen(false)
+    setSettingsOpen(false)
+    setSavesOpen(false)
+    previewPositionedRef.current = false
+    return id
+  }
+
+  const restoreEditorTab = (tab, updateHistory = true) => {
+    setMasterOpen(false)
+    loadData(tab.data)
+    setBaseline(tab.name, tab.baseline)
+    setCurrentSaveName(tab.name)
+    setCurrentSaveTags(tab.tags)
+    setCurrentVersionId(tab.version)
+    setSidebarTab(tab.sidebarTab || 'match')
+    setSidebarExpanded(tab.sidebarExpanded || false)
+    setJsonEditorOpen(tab.jsonEditorOpen || false)
+    setSettingsOpen(tab.settingsOpen || false)
+    setSavesOpen(tab.savesOpen || false)
+    setPrintPreview(tab.printPreview ?? true)
+    setActiveTabId(tab.id)
+    setBoardOpen(false)
+    setRouteLoading(false)
+    previewPositionedRef.current = false
+    if (updateHistory) window.history.pushState(null, '', editorPath(tab.name, tab.version))
+  }
+  const tabsBusy = saving || autoSaving || routeLoading || saveNameOpen || masterBusy
+  tabActions.current = { createEditorTab, restoreEditorTab, busy: tabsBusy, activeTabId, boardOpen, masterOpen }
 
   useEffect(() => {
     if (requestedTemplateId !== 'simple') return
@@ -235,18 +311,31 @@ function App() {
       const previewWidth = (pageCount * pageWidth) + ((pageCount - 1) * columnGap)
       const viewportWidth = previewStage.parentElement.clientWidth
       const pageHeight = pageWidth * (297 / 210)
+      // Extra room on both sides lets the pages be panned freely in either
+      // direction, whichever editor layout is showing.
       const stageWidth = previewWidth + viewportWidth
+      const isNarrow = viewportWidth < 768
+      // Page one opens with its centre 35% of the way across the whole app
+      // window (left of centre, so more of page two shows), unless the job
+      // sidebar would overlap it.
+      const areaLeft = previewStage.parentElement.getBoundingClientRect().left
+      const centredOffset = isNarrow ? 12 : Math.max(24, (window.innerWidth * 0.35) - (pageWidth / 2) - areaLeft)
+      const freeGutter = isNarrow ? 12 : Math.max(viewportWidth * 0.3, centredOffset)
+      const initialScrollLeft = freeGutter - centredOffset
 
       cvElement.style.setProperty('--preview-pages-width', `${previewWidth}px`)
       previewStage.style.setProperty('--preview-stage-width', `${stageWidth}px`)
       previewStage.style.setProperty('--preview-stage-height', `${pageHeight}px`)
-      // Keep the first page 30% from the editor viewport's left edge on
-      // initial load. The viewport remains freely horizontally scrollable.
-      const previewLeftGutter = viewportWidth < 768 ? 12 : viewportWidth * 0.3
-      previewStage.style.setProperty('--preview-side-gutter', `${previewLeftGutter}px`)
+      previewStage.style.setProperty('--preview-side-gutter', `${freeGutter}px`)
 
       if (!previewPositionedRef.current) {
-        previewStage.parentElement.scrollLeft = 0
+        const scroller = previewStage.parentElement
+        if (recentreSmoothRef.current) {
+          scroller.scrollTo({ left: initialScrollLeft, behavior: 'smooth' })
+          recentreSmoothRef.current = false
+        } else {
+          scroller.scrollLeft = initialScrollLeft
+        }
         previewPositionedRef.current = true
       }
     }
@@ -260,24 +349,100 @@ function App() {
       cancelAnimationFrame(frameId)
       resizeObserver.disconnect()
     }
-  }, [printPreview, boardOpen, routeLoading, cvData, effectiveEditorSettings])
+  }, [printPreview, boardOpen, routeLoading, cvData, effectiveEditorSettings, recentreKey])
 
   useEffect(() => {
     if (boardOpen) {
-      document.title = 'CV Workspace'
+      document.title = masterOpen ? 'Master experience - CV Workspace' : 'CV Workspace'
       return
     }
     document.title = `${currentSaveName || 'Unsaved CV'} - CV`
-  }, [boardOpen, currentSaveName])
+  }, [boardOpen, masterOpen, currentSaveName])
 
   useEffect(() => {
     if (!printPreview) previewPositionedRef.current = false
   }, [printPreview])
 
-  const showSnackbar = (message, type = 'success') => {
-    setSnackbar({ message, type })
-    setTimeout(() => setSnackbar(null), 3000)
+  useEffect(() => {
+    if (!workspaceHydrated) return
+    try {
+      setSidebarCollapsed(localStorage.getItem(workspaceStorageKey(SIDEBAR_COLLAPSED_KEY, activeUser.id)) === 'true')
+    } catch {
+      // The sidebar simply starts open when storage is unavailable.
+    }
+  }, [workspaceHydrated, activeUser.id])
+
+  const handleSidebarCollapsedChange = (collapsed) => {
+    setSidebarCollapsed(collapsed)
+    // Once the sidebar has finished resizing (200ms), glide the first page
+    // back to its usual spot for the new amount of room.
+    clearTimeout(recentreTimerRef.current)
+    recentreTimerRef.current = setTimeout(() => {
+      previewPositionedRef.current = false
+      recentreSmoothRef.current = true
+      setRecentreKey((key) => key + 1)
+    }, 230)
+    try {
+      localStorage.setItem(workspaceStorageKey(SIDEBAR_COLLAPSED_KEY, activeUser.id), String(collapsed))
+    } catch {
+      // Remembering the choice is optional.
+    }
   }
+
+  const showSnackbar = (message, type = 'success') => {
+    // Restart the timer so an earlier message cannot dismiss a newer one early.
+    clearTimeout(snackbarTimerRef.current)
+    setSnackbar({ message, type })
+    snackbarTimerRef.current = setTimeout(() => setSnackbar(null), type === 'error' ? 6000 : 3000)
+  }
+
+  // Width of whichever right-hand panel is open (0 when none).
+  const rightPanelWidth = jsonEditorOpen
+    ? RIGHT_PANEL_WIDTHS.json
+    : settingsOpen
+      ? RIGHT_PANEL_WIDTHS.settings
+      : savesOpen
+        ? RIGHT_PANEL_WIDTHS.versions
+        : 0
+
+  const currentSnapshot = useMemo(() => JSON.stringify(cvData), [cvData])
+  const hasUnsavedChanges = currentSnapshot !== savedSnapshot
+  const saveStatus = !currentSaveName
+    ? { tone: 'draft', label: 'Local draft · not saved yet' }
+    : saving || autoSaving
+      ? { tone: 'saving', label: 'Saving…' }
+      : currentVersionId
+        ? { tone: 'version', label: hasUnsavedChanges ? 'Older version · edited' : 'Older version' }
+        : hasUnsavedChanges
+          ? { tone: 'dirty', label: 'Unsaved changes' }
+          : { tone: 'saved', label: 'Saved' }
+  // Warn before leaving while any open tab contains an unsaved working copy.
+  const hasUnsavedTabs = masterDirty || (!!activeTabId && (!currentSaveName || hasUnsavedChanges)) || editorTabs.some((id) => {
+    if (id === activeTabId) return false
+    const tab = tabSessions.current.get(id)
+    return tab && (!tab.name || JSON.stringify(tab.data) !== tab.baseline)
+  })
+
+  useEffect(() => {
+    if (!hasUnsavedTabs) return undefined
+    const warnBeforeLeaving = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [hasUnsavedTabs])
+
+  useEffect(() => {
+    if (boardOpen || routeLoading) return undefined
+    const handleSaveShortcut = (event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 's') return
+      event.preventDefault()
+      if (!event.repeat) handleSaveRef.current?.()
+    }
+    window.addEventListener('keydown', handleSaveShortcut)
+    return () => window.removeEventListener('keydown', handleSaveShortcut)
+  }, [boardOpen, routeLoading])
 
   useEffect(() => {
     if (!workspaceHydrated) return
@@ -314,7 +479,7 @@ function App() {
   }, [autoSave, activeUser.id, workspaceHydrated])
 
   useEffect(() => {
-    if (!autoSave || !currentSaveName || currentVersionId || routeLoading || saving) return undefined
+    if (boardOpen || !autoSave || !currentSaveName || currentVersionId || routeLoading || saving) return undefined
 
     const snapshot = JSON.stringify(cvData)
     const baseline = autoSaveBaselineRef.current
@@ -330,7 +495,7 @@ function App() {
         setAutoSaving(true)
         try {
           await saveToS3(saveData, saveName, saveTags, false, activeUser.id)
-          autoSaveBaselineRef.current = { name: saveName, snapshot }
+          setBaseline(saveName, snapshot)
         } catch (err) {
           console.error('Error auto-saving to S3:', err)
           showSnackbar('Auto-save failed: ' + err.message, 'error')
@@ -346,7 +511,7 @@ function App() {
       clearTimeout(autoSaveTimerRef.current)
       autoSaveTimerRef.current = null
     }
-  }, [autoSave, currentSaveName, currentSaveTags, currentVersionId, cvData, routeLoading, saving])
+  }, [boardOpen, autoSave, currentSaveName, currentSaveTags, currentVersionId, cvData, routeLoading, saving, activeTabId])
 
   useEffect(() => {
     if (boardOpen || routeLoading || currentSaveName) return undefined
@@ -397,21 +562,34 @@ function App() {
     let routeRequest = 0
 
     const syncRoute = async () => {
-      const request = ++routeRequest
       const route = readRoute()
+      if (tabActions.current.busy) {
+        const current = tabSessions.current.get(tabActions.current.activeTabId)
+        window.history.replaceState(null, '', tabActions.current.masterOpen ? '/master' : tabActions.current.boardOpen ? '/' : editorPath(current?.name, current?.version))
+        return
+      }
 
-      if (route.view === 'board') {
+      const request = ++routeRequest
+      if (route.view === 'master' || route.view === 'board') {
+        setMasterOpen(route.view === 'master')
         setBoardOpen(true)
         setRouteLoading(false)
         return
       }
 
+      const existingTab = [...tabSessions.current.values()].find((tab) => tab.name === route.name && tab.version === (route.version || null))
+      if (existingTab) {
+        tabActions.current.restoreEditorTab(existingTab, false)
+        return
+      }
+      setMasterOpen(false)
       setBoardOpen(false)
       if (!route.name) {
         const draft = loadUnsavedDraft(activeUser.id)
         const draftData = draft?.data || initialData
+        tabActions.current.createEditorTab()
         loadData(draftData)
-        autoSaveBaselineRef.current = { name: null, snapshot: JSON.stringify(draftData) }
+        setBaseline(null, JSON.stringify(draftData))
         setCurrentSaveName(null)
         setCurrentSaveTags(draft?.tags || [])
         setCurrentVersionId(null)
@@ -450,14 +628,17 @@ function App() {
         }
 
         const save = saves.find((item) => item.name === route.name)
+        tabActions.current.createEditorTab()
         loadData(data)
-        autoSaveBaselineRef.current = { name: route.name, snapshot: JSON.stringify(data) }
+        setBaseline(route.name, JSON.stringify(data))
         setCurrentSaveName(route.name)
         setCurrentSaveTags(save?.tags || [])
         setCurrentVersionId(loadedVersionId)
       } catch (err) {
         if (request !== routeRequest) return
         console.error('Error loading editor route:', err)
+        window.history.replaceState(null, '', '/')
+        setBoardOpen(true)
         showSnackbar('Error loading: ' + err.message, 'error')
       } finally {
         if (request === routeRequest) setRouteLoading(false)
@@ -473,22 +654,40 @@ function App() {
   }, [activeUser.id, loadData, workspaceHydrated])
 
   const navigateToBoard = () => {
+    if (tabsBusy) return
     window.history.pushState(null, '', '/')
+    setMasterOpen(false)
     setBoardOpen(true)
+  }
+
+  const navigateToMaster = () => {
+    if (tabsBusy) return
+    window.history.pushState(null, '', '/master')
+    setBoardOpen(true)
+    setMasterOpen(true)
   }
 
   const navigateToEditor = (name = null, replace = false, version = null) => {
     window.history[replace ? 'replaceState' : 'pushState'](null, '', editorPath(name, version))
+    setMasterOpen(false)
     setBoardOpen(false)
   }
 
-  const handleUserChange = (userId) => {
+  const handleUserChange = (userId, confirmed = false) => {
     if (userId === activeUser.id) return
+    if (tabsBusy) return
+    const dirty = masterDirty || hasUnsavedChanges || [...tabSessions.current.values()].some((tab) => !tab.name || JSON.stringify(tab.data) !== tab.baseline)
+    if (!confirmed && (editorTabs.length || masterDirty) && dirty && !window.confirm('Switch workspace user and close all open CV tabs? Unsaved edits will be discarded.')) return
+    setMasterDirty(false)
+    tabSessions.current.clear()
+    setEditorTabs([])
+    setActiveTabId(null)
     switchUser(userId)
     setDarkMode(loadDarkMode(userId))
     setAutoSave(loadAutoSave(userId))
     const draft = loadUnsavedDraft(userId)
     loadData(draft?.data || initialData)
+    setBaseline(null, JSON.stringify(draft?.data || initialData))
     setUnsavedDraft(draft)
     setCurrentSaveName(null)
     setCurrentSaveTags(draft?.tags || [])
@@ -496,14 +695,17 @@ function App() {
     navigateToBoard()
   }
 
-  const handleAddUser = () => {
-    const name = window.prompt('Name this local workspace user')
-    if (!name?.trim()) return
+  const handleAddUser = (name) => {
+    if (!name?.trim() || tabsBusy) return
+    const dirty = masterDirty || [...tabSessions.current.values()].some((tab) => !tab.name || JSON.stringify(tab.data) !== tab.baseline)
+    if (dirty && !window.confirm('Create a workspace user and close all open CV tabs? Unsaved edits will be discarded.')) return
     const user = addUser(name)
-    handleUserChange(user.id)
+    handleUserChange(user.id, true)
   }
 
   const handleNewCV = async (boardTag = '', sourceSave = null) => {
+    if (tabsBusy) return false
+    setRouteLoading(true)
     try {
       const sourceData = sourceSave ? await loadFromS3(sourceSave.name, activeUser.id) : initialData
       if (!sourceData) {
@@ -519,8 +721,9 @@ function App() {
         delete nextData.clonedFrom
       }
 
+      createEditorTab()
       loadData(nextData)
-      autoSaveBaselineRef.current = { name: null, snapshot: JSON.stringify(nextData) }
+      setBaseline(null, JSON.stringify(nextData))
       setCurrentSaveName(null)
       setCurrentSaveTags(sourceSave?.tags || (boardTag ? [boardTag] : []))
       setCurrentVersionId(null)
@@ -530,18 +733,22 @@ function App() {
       console.error('Error cloning CV:', err)
       showSnackbar('Error cloning CV: ' + err.message, 'error')
       return false
+    } finally {
+      setRouteLoading(false)
     }
   }
 
   const handleRecoverDraft = () => {
+    if (tabsBusy) return
     const draft = unsavedDraft || loadUnsavedDraft(activeUser.id)
     if (!draft?.data) {
       showSnackbar('No recoverable draft was found', 'error')
       return
     }
 
+    createEditorTab()
     loadData(draft.data)
-    autoSaveBaselineRef.current = { name: null, snapshot: JSON.stringify(draft.data) }
+    setBaseline(null, JSON.stringify(draft.data))
     setCurrentSaveName(null)
     setCurrentSaveTags(draft.tags || [])
     setCurrentVersionId(null)
@@ -550,6 +757,8 @@ function App() {
   }
 
   const handleSave = async () => {
+    if (tabsBusy) return
+    setSaveNameOpen(true)
     try {
       const saves = await listSaves(activeUser.id)
       const allTags = [...new Set(saves.flatMap((s) => s.tags || []))].sort()
@@ -565,6 +774,7 @@ function App() {
     }
     setSaveNameOpen(true)
   }
+  handleSaveRef.current = handleSave
 
   const handleConfirmSave = async (name, tags, mode) => {
     setSaveNameOpen(false)
@@ -572,7 +782,7 @@ function App() {
     try {
       setSaving(true)
       await saveToS3(cvData, name, tags, mode !== 'replace', activeUser.id)
-      autoSaveBaselineRef.current = { name, snapshot: JSON.stringify(cvData) }
+      setBaseline(name, JSON.stringify(cvData))
       if (isSavingUnsavedDraft) {
         try {
           localStorage.removeItem(workspaceStorageKey(UNSAVED_DRAFT_KEY, activeUser.id))
@@ -601,11 +811,19 @@ function App() {
   }
 
   const handleOpenCV = async (name, tags) => {
+    if (tabsBusy) return
+    const existing = [...tabSessions.current.values()].find((tab) => tab.name === name)
+    if (existing) {
+      restoreEditorTab(existing)
+      return
+    }
+    setRouteLoading(true)
     try {
       const data = await loadFromS3(name, activeUser.id)
       if (data) {
+        createEditorTab()
         loadData(data)
-        autoSaveBaselineRef.current = { name, snapshot: JSON.stringify(data) }
+        setBaseline(name, JSON.stringify(data))
         setCurrentSaveName(name)
         setCurrentSaveTags(tags || [])
         setCurrentVersionId(null)
@@ -617,11 +835,15 @@ function App() {
     } catch (err) {
       console.error('Error loading version:', err)
       showSnackbar('Error loading: ' + err.message, 'error')
+    } finally {
+      setRouteLoading(false)
     }
   }
 
   const handleSelectVersion = async (versionId) => {
-    if (!currentSaveName || versionId === currentVersionId) return
+    if (tabsBusy || !currentSaveName || versionId === currentVersionId) return
+    if (hasUnsavedChanges && !window.confirm('Load this version and discard the unsaved edits in this tab?')) return
+    setRouteLoading(true)
 
     try {
       const data = versionId
@@ -633,13 +855,15 @@ function App() {
       }
 
       loadData(data)
-      autoSaveBaselineRef.current = { name: currentSaveName, snapshot: JSON.stringify(data) }
+      setBaseline(currentSaveName, JSON.stringify(data))
       setCurrentVersionId(versionId || null)
       navigateToEditor(currentSaveName, false, versionId || null)
       showSnackbar(versionId ? 'Loaded saved version' : 'Loaded latest version')
     } catch (err) {
       console.error('Error loading CV version:', err)
       showSnackbar('Error loading version: ' + err.message, 'error')
+    } finally {
+      setRouteLoading(false)
     }
   }
 
@@ -692,10 +916,7 @@ function App() {
       await saveSettings(globalSettings)
 
       if (currentSaveName && !currentVersionId) {
-        autoSaveBaselineRef.current = {
-          name: currentSaveName,
-          snapshot: JSON.stringify(updatedCvData),
-        }
+        setBaseline(currentSaveName, JSON.stringify(updatedCvData))
         showSnackbar('Theme settings saved to this CV!')
       } else if (currentVersionId) {
         showSnackbar('Theme applied. Use Save to replace or create a version.')
@@ -727,7 +948,7 @@ function App() {
       return
     }
     if (settingsOpen) handleCloseSettings()
-    setNotesOpen(false)
+    setSavesOpen(false)
     setJsonEditorOpen(true)
   }
 
@@ -737,9 +958,25 @@ function App() {
       return
     }
     setJsonEditorOpen(false)
-    setNotesOpen(false)
+    setSavesOpen(false)
     setSettingsOpen(true)
   }
+
+  // Only one panel at a time opens beside the right-hand toolbar.
+  const handleToggleVersions = () => {
+    if (savesOpen) {
+      setSavesOpen(false)
+      return
+    }
+    if (settingsOpen) handleCloseSettings()
+    setJsonEditorOpen(false)
+    setSavesOpen(true)
+  }
+
+  // Versions belong to a saved CV, so close the panel when there isn't one.
+  useEffect(() => {
+    if (!currentSaveName) setSavesOpen(false)
+  }, [currentSaveName])
 
   const handleAI = async () => {
     const prompt = settings.aiPromptTemplate.replace('{cv_json}', JSON.stringify(cvData, null, 2))
@@ -760,12 +997,62 @@ function App() {
     updateField('presentation.templateId', nextTemplateId)
   }
 
+  const handleCloseTab = (id) => {
+    if (tabsBusy) return
+    const tab = tabSessions.current.get(id)
+    if (tab && (!tab.name || JSON.stringify(tab.data) !== tab.baseline)
+      && !window.confirm(`Close “${tab.name || 'Untitled CV'}” and discard its unsaved edits?`)) return
+    const remaining = editorTabs.filter((tabId) => tabId !== id)
+    tabSessions.current.delete(id)
+    setEditorTabs(remaining)
+    if (id === activeTabId) {
+      const next = remaining[Math.min(editorTabs.indexOf(id), remaining.length - 1)]
+      if (!boardOpen && next) restoreEditorTab(tabSessions.current.get(next))
+      else {
+        setActiveTabId(null)
+        setCurrentSaveName(null)
+        setBaseline(null, JSON.stringify(cvData))
+        navigateToBoard()
+      }
+    }
+  }
+
+  useEffect(() => {
+    const closeShortcut = (event) => {
+      const primary = event.metaKey || event.ctrlKey
+      const closeKey = primary && !event.altKey && (
+        (!event.shiftKey && event.key.toLowerCase() === 'w') ||
+        (event.shiftKey && event.key.toLowerCase() === 'k')
+      )
+      if (!closeKey || boardOpen || !activeTabId) return
+      event.preventDefault()
+      if (event.repeat || document.querySelector('[role="dialog"]')) return
+      handleCloseTab(activeTabId)
+    }
+    window.addEventListener('keydown', closeShortcut)
+    return () => window.removeEventListener('keydown', closeShortcut)
+  })
+
   return (
     <AppLayout
-      activePage={boardOpen ? 'board' : 'editor'}
+      activePage={masterOpen ? 'master' : boardOpen ? 'board' : 'editor'}
       currentSaveName={currentSaveName}
       onNavigateBoard={navigateToBoard}
-      onNavigateEditor={() => navigateToEditor(currentSaveName)}
+      onNavigateMaster={navigateToMaster}
+      editorTabs={editorTabs.map((id, index) => {
+        const tab = id === activeTabId
+          ? { name: currentSaveName, data: cvData, baseline: savedSnapshot }
+          : tabSessions.current.get(id)
+        return { id, label: tab?.name || `Untitled CV ${index + 1}`, dirty: tab && (!tab.name || JSON.stringify(tab.data) !== tab.baseline) }
+      })}
+      activeTabId={boardOpen ? null : activeTabId}
+      tabsBusy={tabsBusy}
+      onSelectTab={(id) => {
+        if (tabsBusy) return
+        const tab = tabSessions.current.get(id)
+        if (tab) restoreEditorTab(tab)
+      }}
+      onCloseTab={handleCloseTab}
       darkMode={darkMode}
       onToggleDarkMode={() => setDarkMode((current) => !current)}
       templateId={activeTemplateId}
@@ -775,34 +1062,30 @@ function App() {
       activeUser={activeUser}
       onUserChange={handleUserChange}
       onAddUser={handleAddUser}
+      saveStatus={saveStatus}
     >
-      {boardOpen ? (
-        <BoardDashboard
-          onCreateNew={handleNewCV}
-          onLoad={handleOpenCV}
-          recoverableDraft={unsavedDraft}
-          onRecoverDraft={handleRecoverDraft}
-          userId={activeUser.id}
-        />
+      {workspaceHydrated && <div hidden={!masterOpen} className="h-full min-h-0">
+        <MasterExperience key={activeUser.id} userId={activeUser.id} userName={activeUser.name} onDirtyChange={setMasterDirty} onBusyChange={setMasterBusy} />
+      </div>}
+      {masterOpen ? null : boardOpen ? (
+        <div className="h-full min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0">
+            <BoardDashboard
+              onCreateNew={handleNewCV}
+              onLoad={handleOpenCV}
+              recoverableDraft={unsavedDraft}
+              onRecoverDraft={handleRecoverDraft}
+              userId={activeUser.id}
+            />
+          </div>
+        </div>
       ) : routeLoading ? (
-        <div className="h-full flex items-center justify-center bg-bg-light text-sm text-text-light">
+        <div role="status" className="h-full flex flex-col items-center justify-center gap-3 text-sm text-text-light">
+          <span className="w-6 h-6 rounded-full border-2 border-border-light border-t-deep-blue animate-spin" aria-hidden="true" />
           Loading CV…
         </div>
       ) : (
         <>
-          <ScratchNotes
-            value={cvData.notes}
-            onChange={(notes) => updateField('notes', notes)}
-            cvName={currentSaveName}
-            clonedFrom={typeof cvData.clonedFrom === 'string' ? cvData.clonedFrom : ''}
-            userId={activeUser.id}
-            refreshKey={`${saving ? 1 : 0}:${autoSaving ? 1 : 0}`}
-            open={notesOpen}
-            onOpenChange={setNotesOpen}
-            onOpenCv={(name) => {
-              if (name && name !== currentSaveName) handleOpenCV(name)
-            }}
-          />
           <Toolbar
             onSave={handleSave}
             onExportPDF={handleExportPDF}
@@ -813,19 +1096,25 @@ function App() {
             onAI={handleAI}
             onSettings={handleOpenSettings}
             settingsOpen={settingsOpen}
-            onVersions={() => setSavesOpen(true)}
+            onVersions={handleToggleVersions}
+            versionsOpen={savesOpen}
             versionsDisabled={!currentSaveName}
             saving={saving}
             autoSave={autoSave}
             autoSaving={autoSaving}
             autoSaveDisabled={!currentSaveName || !!currentVersionId}
             onToggleAutoSave={() => setAutoSave((current) => !current)}
-            notesOpen={notesOpen}
+            notesOpen={sidebarExpanded && sidebarTab === 'notes'}
             onToggleNotes={() => {
-              setNotesOpen((open) => !open)
-              setJsonEditorOpen(false)
-              if (settingsOpen) handleCloseSettings()
+              // Small screens only: unfold the job sidebar on its Notes tab,
+              // which sits above the CV at the top of the page.
+              const showing = sidebarExpanded && sidebarTab === 'notes'
+              setSidebarTab('notes')
+              setSidebarExpanded(!showing)
+              if (!showing) document.querySelector('.app-shell main')?.scrollTo({ top: 0, behavior: 'smooth' })
             }}
+            drawerWidth={rightPanelWidth}
+            hasUnsavedChanges={hasUnsavedChanges}
           />
           <SaveNameModal
             isOpen={saveNameOpen}
@@ -836,17 +1125,59 @@ function App() {
             allTags={saveModalData.allTags}
             existingNames={saveModalData.existingNames}
           />
-          <SavesModal
+          <VersionsDrawer
             isOpen={savesOpen}
             onClose={() => setSavesOpen(false)}
             cvName={currentSaveName}
             currentVersionId={currentVersionId}
             onLoadVersion={handleSelectVersion}
+            hasUnsavedChanges={hasUnsavedChanges}
+            refreshKey={`${saving ? 1 : 0}:${autoSaving ? 1 : 0}`}
             userId={activeUser.id}
           />
-          <div className={`app-content print:pt-0 ${printPreview ? 'page-preview' : ''}`}>
-            <div className="page-preview-stage">
-              <CVPage cvData={cvData} updateField={updateField} />
+          <div
+            style={{ '--right-panel-width': `${rightPanelWidth}px` }}
+            className="cv-editor-workspace flex flex-col lg:flex-row lg:h-full min-h-0 lg:pr-[var(--right-panel-width)] lg:transition-[padding] lg:duration-200 print:block print:h-auto print:pr-0"
+          >
+            <JobSidebar
+              cvName={currentSaveName}
+              userId={activeUser.id}
+              cvData={cvData}
+              tab={sidebarTab}
+              onTabChange={setSidebarTab}
+              expanded={sidebarExpanded}
+              onExpandedChange={setSidebarExpanded}
+              collapsed={sidebarCollapsed}
+              onCollapsedChange={handleSidebarCollapsedChange}
+              notes={cvData.notes}
+              onNotesChange={(notes) => updateField('notes', notes)}
+              clonedFrom={typeof cvData.clonedFrom === 'string' ? cvData.clonedFrom : ''}
+              timelineRefreshKey={`${saving ? 1 : 0}:${autoSaving ? 1 : 0}`}
+              onOpenCv={(name) => {
+                if (name && name !== currentSaveName) handleOpenCV(name)
+              }}
+            />
+            <div className="min-w-0 flex-1 flex flex-col lg:min-h-0 print:block">
+              {currentVersionId && (
+                <div role="status" className="version-notice shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 sm:px-5 py-2 border-b border-violet-200 bg-violet-50 text-violet-900 text-xs print:hidden">
+                  <FiClock size={14} className="shrink-0" />
+                  <span className="min-w-0 flex-1 basis-48">
+                    You are viewing an older saved version. Edits here are not auto-saved — use Save to replace the latest or keep them as a new version.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectVersion(null)}
+                    className="font-semibold underline underline-offset-2 hover:no-underline"
+                  >
+                    Back to latest
+                  </button>
+                </div>
+              )}
+              <div className={`app-content cv-editor-preview min-w-0 flex-1 lg:min-h-0 lg:overflow-auto print:overflow-visible print:pt-0 ${printPreview ? 'page-preview' : ''}`}>
+                <div className="page-preview-stage">
+                  <CVPage cvData={cvData} updateField={updateField} />
+                </div>
+              </div>
             </div>
           </div>
         </>
@@ -868,13 +1199,22 @@ function App() {
         onPreview={handlePreviewSettings}
         onSave={handleSaveSettings}
       />
-      {snackbar && (
-        <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg text-white text-sm font-medium shadow-lg z-3000 backdrop-blur-sm print:hidden ${snackbar.type === 'error' ? 'bg-red-600/70' : 'bg-green-600/70'}`}
-        >
-          {snackbar.message}
-        </div>
-      )}
+      <div
+        role={snackbar?.type === 'error' ? 'alert' : 'status'}
+        aria-live={snackbar?.type === 'error' ? 'assertive' : 'polite'}
+        className="fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 z-3000 flex justify-center pointer-events-none print:hidden"
+      >
+        {snackbar && (
+          <div
+            className={`snackbar pointer-events-auto flex items-start gap-2.5 max-w-md pl-3.5 pr-4 py-2.5 rounded-xl text-white text-sm font-medium shadow-xl ${snackbar.type === 'error' ? 'bg-red-700' : 'bg-slate-900'}`}
+          >
+            {snackbar.type === 'error'
+              ? <FiAlertCircle size={17} className="shrink-0 mt-px" />
+              : <FiCheckCircle size={17} className="shrink-0 mt-px text-emerald-400" />}
+            <span className="min-w-0 break-words">{snackbar.message}</span>
+          </div>
+        )}
+      </div>
     </AppLayout>
   )
 }

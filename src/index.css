@@ -45,13 +45,14 @@ body.dark-ui-body {
   print-color-adjust: exact;
 }
 
-@keyframes left-drawer-enter {
-  from { transform: translateX(-100%); }
+@keyframes right-drawer-enter {
+  from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
 
-.left-settings-drawer {
-  animation: left-drawer-enter 180ms ease-out;
+/* CV tool panels (JSON editor, theme settings) open beside the right toolbar. */
+.right-tools-drawer {
+  animation: right-drawer-enter 180ms ease-out;
 }
 
 .page-preview {
@@ -657,8 +658,7 @@ body.dark-ui-body {
   color: #6e6e6e;
 }
 
-.dark-ui .toolbar,
-.dark-ui .scratch-notes {
+.dark-ui .toolbar {
   background-color: rgb(31 31 31 / 0.45);
   border-color: rgb(255 255 255 / 0.12);
   backdrop-filter: blur(12px);
@@ -666,18 +666,11 @@ body.dark-ui-body {
   box-shadow: 0 4px 24px rgb(0 0 0 / 0.45);
 }
 
-.dark-ui .toolbar button,
-.dark-ui .scratch-notes-toggle {
+.dark-ui .toolbar button {
   color: #cccccc;
 }
 
-.dark-ui .scratch-notes textarea {
-  background-color: transparent;
-  color: #cccccc;
-}
-
-.dark-ui .toolbar button:hover,
-.dark-ui .scratch-notes-toggle:hover {
+.dark-ui .toolbar button:hover {
   color: #ffffff;
 }
 
@@ -700,6 +693,82 @@ body.dark-ui-body {
   background-color: rgb(60 60 60 / 0.9);
 }
 
+.dark-ui .toolbar-tooltip,
+.dark-ui .snackbar {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18), 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+/* Selects that sit inside an already-themed control keep its background. */
+.dark-ui select.bg-transparent {
+  background-color: transparent;
+}
+
+/* Tinted status surfaces (deadlines, job-match chips, notices) are authored
+   for a light canvas. Outside the CV page, swap them for translucent tints so
+   they do not glare against the dark workspace. */
+.dark-ui :where(.bg-amber-50):not(.cv-container *) {
+  background-color: rgb(245 158 11 / 0.14);
+  border-color: rgb(245 158 11 / 0.35);
+  color: #fcd34d;
+}
+
+.dark-ui :where(.bg-sky-50):not(.cv-container *) {
+  background-color: rgb(56 189 248 / 0.12);
+  border-color: rgb(56 189 248 / 0.3);
+  color: #7dd3fc;
+}
+
+.dark-ui :where(.bg-red-50):not(.cv-container *) {
+  background-color: rgb(248 113 113 / 0.12);
+  border-color: rgb(248 113 113 / 0.35);
+  color: #fca5a5;
+}
+
+.dark-ui :where(.bg-emerald-50, .bg-green-50):not(.cv-container *) {
+  background-color: rgb(52 211 153 / 0.12);
+  border-color: rgb(52 211 153 / 0.3);
+  color: #6ee7b7;
+}
+
+.dark-ui :where(.bg-violet-50):not(.cv-container *) {
+  background-color: rgb(167 139 250 / 0.14);
+  border-color: rgb(167 139 250 / 0.35);
+  color: #c4b5fd;
+}
+
+.dark-ui :where(.bg-slate-50\/80, .bg-slate-100):not(.cv-container *) {
+  background-color: #252526;
+  border-color: #3c3c3c;
+}
+
+.dark-ui :where(.bg-slate-200):not(.cv-container *) {
+  background-color: #3c3c3c;
+}
+
+.dark-ui :where(.border-slate-100, .border-slate-200):not(.cv-container *) {
+  border-color: #3c3c3c;
+}
+
+.dark-ui :where(.text-slate-900):not(.cv-container *) {
+  color: #e5e5e5;
+}
+
+.dark-ui :where(.text-slate-600, .text-slate-700):not(.cv-container *) {
+  color: #cccccc;
+}
+
+.dark-ui :where(.text-slate-400, .text-slate-500):not(.cv-container *) {
+  color: #969696;
+}
+
+.dark-ui :where(.text-teal-700):not(.cv-container *) {
+  color: #2dd4bf;
+}
+
+.dark-ui :where(.text-red-600, .text-red-700):not(.cv-container *) {
+  color: #fca5a5;
+}
+
 @media (max-width: 767px) {
   .page-preview {
     padding: 12px 0 8px;
@@ -709,8 +778,7 @@ body.dark-ui-body {
     font-size: 16px;
   }
 
-  .toolbar button,
-  .scratch-notes-toggle {
+  .toolbar button {
     touch-action: manipulation;
   }
 }
@@ -778,3 +846,53 @@ body.dark-ui-body {
   margin-bottom: 0;
   margin-left: 0;
 }
+
+/* Roomier interface sizing; document typography stays template controlled. */
+.app-shell {
+  --spacing: 0.25rem;
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 1.0625rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  font-size: 1rem;
+}
+
+.app-shell [class~="text-[9px]"]:not(.cv-container *) { font-size: 11px; }
+.app-shell [class~="text-[10px]"]:not(.cv-container *) { font-size: 12px; }
+.app-shell [class~="text-[11px]"]:not(.cv-container *) { font-size: 13px; }
+.app-shell [class~="text-[12px]"]:not(.cv-container *) { font-size: 14px; }
+
+.app-shell .cv-container {
+  --spacing: 0.25rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+}
+
+/* Explicit tab surfaces keep hover contrast consistent in both themes. */
+.workspace-tab {
+  color: var(--color-text-light);
+  border-color: transparent;
+  background-color: transparent;
+  transition: background-color 120ms, color 120ms, border-color 120ms;
+}
+.workspace-tab:hover { background-color: #e2e8f0; color: #334155; }
+.workspace-tab[data-active='true'] {
+  background-color: #fff;
+  color: var(--color-deep-blue);
+  border-color: var(--color-border-light);
+  box-shadow: inset 0 2px 0 var(--color-deep-blue);
+}
+.workspace-tab-close:hover { background-color: #e2e8f0; color: #334155; }
+.dark-ui .workspace-tab:hover { background-color: #303034; color: #e2e2e2; }
+.dark-ui .workspace-tab[data-active='true'] {
+  background-color: #1f1f1f;
+  color: #75b6ff;
+  border-color: #3c3c3c;
+}
+.dark-ui .workspace-tab-close:hover { background-color: #414146; color: #fff; }

@@ -4,3 +4,7 @@ dist
 .env
 .env.local
 .env.*.local
+
+# Personal master experience data is persisted in S3.
+/master.json
+/master-source-archive.json

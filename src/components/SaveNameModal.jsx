@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiCopy, FiFilePlus, FiRefreshCw, FiX } from 'react-icons/fi'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 const sanitize = (name) =>
   name.trim().replace(/[^a-zA-Z0-9\-_. ]/g, '').slice(0, 80)
@@ -59,9 +60,10 @@ export const SaveNameModal = ({
     onConfirm(safe, finalTags, mode)
   }
 
+  useEscapeKey(isOpen, onCancel)
+
   const handleNameKeyDown = (e) => {
     if (e.key === 'Enter') handleConfirm()
-    if (e.key === 'Escape') onCancel()
   }
 
   const handleTagInputChange = (e) => {
@@ -80,8 +82,6 @@ export const SaveNameModal = ({
       addTag(tagInput)
     } else if (e.key === 'Backspace' && !tagInput && tags.length) {
       removeTag(tags[tags.length - 1])
-    } else if (e.key === 'Escape') {
-      onCancel()
     }
   }
 
@@ -96,8 +96,8 @@ export const SaveNameModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] print:hidden">
-      <div className="bg-white rounded-xl shadow-2xl w-[36rem] max-w-[calc(100vw-2rem)] p-6">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-deep-blue">
+      <div role="dialog" aria-modal="true" aria-labelledby="save-cv-title" className="bg-white rounded-xl shadow-2xl w-[36rem] max-w-[calc(100vw-2rem)] max-h-[90dvh] overflow-y-auto p-6">
+        <h3 id="save-cv-title" className="text-xs font-bold uppercase tracking-widest text-deep-blue">
           Save CV
         </h3>
         <p className="text-xs text-text-light mt-1 mb-4">

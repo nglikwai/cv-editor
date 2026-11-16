@@ -20,5 +20,11 @@ export const loadSettings = () => request('loadSettings')
 export const saveSettings = (data) => request('saveSettings', { data })
 export const loadBoard = (userId = 'default') => request('loadBoard', { userId })
 export const getCvTimeline = (name, userId = 'default') => request('getCvTimeline', { name, userId })
+export const loadJobDetail = (name, userId = 'default') => request('loadJobDetail', { name, userId })
+export const updateSaveJobProfile = (name, profile, userId = 'default') => request('updateSaveJobProfile', { name, profile, userId })
+export const updateSaveDeadline = (name, deadline, userId = 'default') => request('updateSaveDeadline', { name, deadline, userId })
 export const updateSaveStatus = (name, status, userId = 'default') => request('updateSaveStatus', { name, status, userId })
 
+
+export const loadMasterExperience = (userId = 'default') => request('loadMasterExperience', { userId })
+export const saveMasterExperience = (data, userId = 'default') => request('saveMasterExperience', { data, userId })
